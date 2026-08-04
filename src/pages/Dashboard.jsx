@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { store, subscribeStore } from '../lib/store.js';
+import {
+  fetchGuests,
+  fetchGHMaintenance,
+  fetchGHInventory,
+  fetchBillPayments,
+  fetchOfficeAssets,
+  fetchOfficeMaintenance,
+  fetchActivityLogs
+} from '../lib/supabaseService.js';
 import { MaintenancePieChart } from '../components/charts/MaintenancePieChart.jsx';
 import { BillsBarChart } from '../components/charts/BillsBarChart.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
@@ -17,34 +26,61 @@ import {
   ClipboardList,
   ShieldCheck
 } from 'lucide-react';
+import { TableLoader } from '../components/common/Loader.jsx';
 
 export const Dashboard = ({ setActivePage }) => {
   const { currentUser, hasModulePermission } = useAuth();
+  const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     users: store.getUsers(),
-    guests: store.getGuests(),
-    ghMaintenance: store.getGHMaintenance(),
-    ghInventory: store.getGHInventory(),
-    bills: store.getOfficeBills(),
-    officeAssets: store.getOfficeAssets(),
-    officeMaintenance: store.getOfficeMaintenance(),
-    activityLogs: store.getActivityLogs()
+    guests: [],
+    ghMaintenance: [],
+    ghInventory: [],
+    bills: [],
+    officeAssets: [],
+    officeMaintenance: [],
+    activityLogs: []
   });
 
-  useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
+  const loadDashboardData = async () => {
+    setLoading(true);
+    try {
+      const [
+        guestsRes,
+        ghMaintRes,
+        ghInvRes,
+        billsRes,
+        officeAssetsRes,
+        officeMaintRes,
+        logsRes
+      ] = await Promise.all([
+        fetchGuests(),
+        fetchGHMaintenance(),
+        fetchGHInventory(),
+        fetchBillPayments(),
+        fetchOfficeAssets(),
+        fetchOfficeMaintenance(),
+        fetchActivityLogs(20)
+      ]);
+
       setData({
         users: store.getUsers(),
-        guests: store.getGuests(),
-        ghMaintenance: store.getGHMaintenance(),
-        ghInventory: store.getGHInventory(),
-        bills: store.getOfficeBills(),
-        officeAssets: store.getOfficeAssets(),
-        officeMaintenance: store.getOfficeMaintenance(),
-        activityLogs: store.getActivityLogs()
+        guests: guestsRes.data?.length ? guestsRes.data : store.getGuests(),
+        ghMaintenance: ghMaintRes.data?.length ? ghMaintRes.data : store.getGHMaintenance(),
+        ghInventory: ghInvRes.data?.length ? ghInvRes.data : store.getGHInventory(),
+        bills: billsRes.data?.length ? billsRes.data : store.getBillPayments(),
+        officeAssets: officeAssetsRes.data?.length ? officeAssetsRes.data : store.getOfficeAssets(),
+        officeMaintenance: officeMaintRes.data?.length ? officeMaintRes.data : store.getOfficeMaintenance(),
+        activityLogs: logsRes.data?.length ? logsRes.data : store.getActivityLogs()
       });
-    });
-    return unsubscribe;
+    } catch (err) {
+      console.warn('Supabase dashboard load failed, using local store:', err);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadDashboardData();
   }, []);
 
   // Compute Statistics per module
@@ -65,14 +101,13 @@ export const Dashboard = ({ setActivePage }) => {
   // Filtered activity feed based on module access permissions
   const filteredActivityLogs = data.activityLogs.filter(log => {
     if (role === 'super_admin' || role === 'admin') return true;
-    const key = log.moduleName.toLowerCase().replace(/\s+/g, '_');
+    const key = (log.moduleName || '').toLowerCase().replace(/\s+/g, '_');
     return hasModulePermission(key);
   }).slice(0, 6);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       
-
       {/* Access-Based Module KPI Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
         
@@ -97,20 +132,24 @@ export const Dashboard = ({ setActivePage }) => {
                   Checked-in Guests
                 </span>
                 <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {totalGuestsCheckedIn}
+                  {loading ? '...' : totalGuestsCheckedIn}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#DBEAFE', color: '#1D4ED8' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <UserCheck size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View Guest List <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Active stay allocations <ArrowRight size={12} />
+            </p>
           </div>
         )}
 
-        {/* 2. Guest House Maintenance Stat Card */}
+        {/* 2. GH Maintenance Stat Card */}
         {hasModulePermission('gh_maintenance') && (
           <div
             onClick={() => setActivePage('gh_maintenance')}
@@ -120,29 +159,35 @@ export const Dashboard = ({ setActivePage }) => {
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
               boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'var(--transition-fast)'
             }}
+            className="hover-card"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Guest House Repairs
+                  GH Maintenance
                 </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: data.ghMaintenance.filter(m => m.status === 'Open').length > 0 ? '#EF4444' : 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {data.ghMaintenance.filter(m => m.status === 'Open').length} Open
+                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                  {loading ? '...' : data.ghMaintenance.filter(m => m.status === 'Open').length}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#FEE2E2', color: '#B91C1C' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <Wrench size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View GH Maintenance <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Open repair tickets <ArrowRight size={12} />
+            </p>
           </div>
         )}
 
-        {/* 3. Guest House Inventory Stat Card */}
+        {/* 3. GH Inventory Stat Card */}
         {hasModulePermission('gh_inventory') && (
           <div
             onClick={() => setActivePage('gh_inventory')}
@@ -152,29 +197,35 @@ export const Dashboard = ({ setActivePage }) => {
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
               boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'var(--transition-fast)'
             }}
+            className="hover-card"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Inventory Items
+                  GH Inventory
                 </span>
                 <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {totalInventoryCount} Units
+                  {loading ? '...' : totalInventoryCount}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#FEF3C7', color: '#B45309' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <Package size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View Inventory Catalog <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Total tracked units <ArrowRight size={12} />
+            </p>
           </div>
         )}
 
-        {/* 4. Office Bill Payments Stat Card */}
+        {/* 4. Office Bills Stat Card */}
         {hasModulePermission('office_bills') && (
           <div
             onClick={() => setActivePage('office_bills')}
@@ -184,29 +235,35 @@ export const Dashboard = ({ setActivePage }) => {
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
               boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'var(--transition-fast)'
             }}
+            className="hover-card"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Office Bill Payments
+                  Total Bill Payments
                 </span>
-                <h3 style={{ fontSize: '1.375rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  GHS {totalBillsAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                  {loading ? '...' : `GHS ${totalBillsAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#DCFCE7', color: '#15803D' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10B981',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <CreditCard size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View Bill Disbursements <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              {data.bills.length} disbursements logged <ArrowRight size={12} />
+            </p>
           </div>
         )}
 
-        {/* 5. Office Asset List Stat Card */}
+        {/* 5. Office Assets Stat Card */}
         {hasModulePermission('office_assets') && (
           <div
             onClick={() => setActivePage('office_assets')}
@@ -216,25 +273,31 @@ export const Dashboard = ({ setActivePage }) => {
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
               boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'var(--transition-fast)'
             }}
+            className="hover-card"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Tagged Office Assets
+                  Registered Assets
                 </span>
                 <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {totalAssetsCount} Assets
+                  {loading ? '...' : totalAssetsCount}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#E0E7FF', color: '#4338CA' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <Barcode size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View Asset Registry <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Barcode tagged devices <ArrowRight size={12} />
+            </p>
           </div>
         )}
 
@@ -248,186 +311,149 @@ export const Dashboard = ({ setActivePage }) => {
               backgroundColor: 'var(--bg-card)',
               border: '1px solid var(--border-color)',
               boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              transition: 'var(--transition-fast)'
             }}
+            className="hover-card"
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Office Maintenance
+                  Office Repairs
                 </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: officeMaintenanceOpen > 0 ? '#EF4444' : 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {officeMaintenanceOpen} Open
+                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                  {loading ? '...' : officeMaintenanceOpen}
                 </h3>
               </div>
-              <div style={{ padding: '0.625rem', borderRadius: 'var(--radius-md)', backgroundColor: '#FFEDD5', color: '#C2410C' }}>
+              <div style={{
+                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+                backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#EC4899',
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
                 <Wrench size={22} />
               </div>
             </div>
-            <div style={{ marginTop: '0.875rem', fontSize: '0.75rem', color: 'var(--color-primary)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              View Office Maintenance <ChevronRight size={14} />
-            </div>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Facility & Generator tickets <ArrowRight size={12} />
+            </p>
           </div>
         )}
-
       </div>
 
-      {/* Analytics Charts & Recent Activity Row (Shown based on access) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem' }}>
+      {/* Analytics Charts & Visual Summaries Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
         
-        {/* Maintenance Breakdown Chart */}
-        {(hasModulePermission('gh_maintenance') || hasModulePermission('office_maintenance')) && (
-          <div style={{
-            backgroundColor: 'var(--bg-card)',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-color)',
-            padding: '1.5rem',
-            boxShadow: 'var(--shadow-sm)'
-          }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-              Maintenance Issues Breakdown
-            </h3>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Status breakdown across Guest House & Office Facilities.
-            </p>
-            <MaintenancePieChart
-              openCount={openMaintenanceCount}
-              inProgressCount={inProgressMaintenanceCount}
-              resolvedCount={resolvedMaintenanceCount}
-            />
-          </div>
-        )}
-
-        {/* Bills Payment Chart */}
-        {hasModulePermission('office_bills') && (
-          <div style={{
-            backgroundColor: 'var(--bg-card)',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--border-color)',
-            padding: '1.5rem',
-            boxShadow: 'var(--shadow-sm)'
-          }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-              Monthly Office Bill Disbursements
-            </h3>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-              Cheque payments trend in Ghanaian Cedi (GHS).
-            </p>
-            <BillsBarChart billItems={data.bills} />
-          </div>
-        )}
-
-        {/* Recent Audit Activity Feed — Timeline Style */}
+        {/* Visual Chart 1: Maintenance Status Breakdown */}
         <div style={{
-          backgroundColor: 'var(--bg-card)',
-          borderRadius: 'var(--radius-lg)',
-          border: '1px solid var(--border-color)',
           padding: '1.5rem',
-          boxShadow: 'var(--shadow-sm)',
-          display: 'flex',
-          flexDirection: 'column'
+          borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Activity size={18} color="var(--color-primary)" /> Recent Activity
-            </h3>
+          <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+            Overall Maintenance Ticket Status
+          </h4>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Aggregated work order status across Guest House and Central Office.
+          </p>
+          <MaintenancePieChart
+            openCount={openMaintenanceCount}
+            inProgressCount={inProgressMaintenanceCount}
+            resolvedCount={resolvedMaintenanceCount}
+          />
+        </div>
+
+        {/* Visual Chart 2: Recent Disbursements Bar Breakdown */}
+        <div style={{
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+            Utility & Vendor Bill Disbursements
+          </h4>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+            Recent payments breakdown (GHS).
+          </p>
+          <BillsBarChart bills={data.bills} />
+        </div>
+      </div>
+
+      {/* Bottom Row: Recent Activity Log Feed & Quick Links */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
+        
+        {/* Activity Trail Feed */}
+        <div style={{
+          padding: '1.5rem',
+          borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Activity size={18} color="var(--color-primary)" />
+              <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                Recent Operational Activity
+              </h4>
+            </div>
             {role !== 'staff' && (
-              <button className="btn btn-ghost btn-sm" onClick={() => setActivePage('activity_log')}>
-                View All <ArrowRight size={14} />
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => setActivePage('activity_log')}
+                style={{ fontSize: '0.8125rem', color: 'var(--color-primary)' }}
+              >
+                View Full Audit Log <ChevronRight size={14} />
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-            {filteredActivityLogs.map((log, idx) => {
-              const isLast = idx === filteredActivityLogs.length - 1;
-
-              // Per-module icon config
-              const moduleConfig = {
-                'Guest List':              { icon: Users,        bg: '#1A3FA0', light: 'rgba(26,63,160,0.12)' },
-                'Guest House Maintenance': { icon: Wrench,       bg: '#D97706', light: 'rgba(217,119,6,0.12)'  },
-                'Guest House Inventory':   { icon: Package,      bg: '#7C3AED', light: 'rgba(124,58,237,0.12)' },
-                'Office Bill Payments':    { icon: CreditCard,   bg: '#059669', light: 'rgba(5,150,105,0.12)'  },
-                'Office Asset List':       { icon: Barcode,      bg: '#DC2626', light: 'rgba(220,38,38,0.12)'  },
-                'Office Maintenance':      { icon: Wrench,       bg: '#D97706', light: 'rgba(217,119,6,0.12)'  },
-                'Activity Log':            { icon: ClipboardList,bg: '#0891B2', light: 'rgba(8,145,178,0.12)'  },
-                'User Management':         { icon: ShieldCheck,  bg: '#B45309', light: 'rgba(180,83,9,0.12)'   },
-              };
-              const cfg = moduleConfig[log.moduleName] || { icon: Activity, bg: '#1A3FA0', light: 'rgba(26,63,160,0.12)' };
-              const IconComp = cfg.icon;
-
-              // Human-readable time-ago
-              const timeAgo = (() => {
-                try {
-                  const parts = log.timestamp.split(' ');
-                  const [datePart, timePart] = parts;
-                  const dt = new Date(`${datePart}T${timePart}`);
-                  const diffMs = Date.now() - dt.getTime();
-                  const mins = Math.floor(diffMs / 60000);
-                  if (mins < 60) return `${mins} min${mins !== 1 ? 's' : ''} ago`;
-                  const hrs = Math.floor(mins / 60);
-                  if (hrs < 24) return `${hrs} hr${hrs !== 1 ? 's' : ''} ago`;
-                  const days = Math.floor(hrs / 24);
-                  return `${days} day${days !== 1 ? 's' : ''} ago`;
-                } catch { return log.timestamp; }
-              })();
-
-              // Action title
-              const actionTitle = (() => {
-                if (log.action === 'Created') return `New ${log.moduleName.replace('Guest House ', 'GH ').replace('Office ', '')} record added`;
-                if (log.action === 'Edited')  return `${log.moduleName.replace('Guest House ', 'GH ').replace('Office ', '')} updated`;
-                if (log.action === 'Deleted') return `Record removed from ${log.moduleName.replace('Guest House ', 'GH ')}` ;
-                return log.action;
-              })();
-
-              return (
-                <div key={log.id} style={{ display: 'flex', gap: '1rem', position: 'relative' }}>
-                  {/* Timeline connector */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0, width: '44px' }}>
-                    {/* Icon circle */}
-                    <div style={{
-                      width: '44px',
-                      height: '44px',
-                      borderRadius: '50%',
-                      backgroundColor: cfg.light,
-                      border: `2px solid ${cfg.bg}22`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                      zIndex: 1
-                    }}>
-                      <IconComp size={20} color={cfg.bg} strokeWidth={1.8} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
+            {filteredActivityLogs.length > 0 ? (
+              filteredActivityLogs.map(log => (
+                <div
+                  key={log.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.75rem 1rem',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: 'var(--bg-card-hover)',
+                    border: '1px solid var(--border-color)'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <img
+                      src={log.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                      alt={log.userName}
+                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
+                    />
+                    <div>
+                      <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                        {log.userName}
+                      </span>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        {log.action} record in <strong style={{ color: 'var(--text-main)' }}>{log.moduleName}</strong>: {log.recordAffected}
+                      </p>
                     </div>
-                    {/* Vertical line connecting items */}
-                    {!isLast && (
-                      <div style={{
-                        width: '2px',
-                        flex: 1,
-                        minHeight: '20px',
-                        backgroundColor: 'var(--border-color)',
-                        margin: '4px 0'
-                      }} />
-                    )}
                   </div>
-
-                  {/* Content */}
-                  <div style={{ flex: 1, paddingBottom: isLast ? 0 : '1.25rem', paddingTop: '0.25rem' }}>
-                    <p style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)', lineHeight: 1.3, marginBottom: '0.2rem' }}>
-                      {actionTitle}
-                    </p>
-                    <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.4, marginBottom: '0.375rem' }}>
-                      {log.recordAffected}
-                    </p>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                      {timeAgo}
-                    </span>
-                  </div>
+                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                  </span>
                 </div>
-              );
-            })}
+              ))
+            ) : (
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
+                No recent activity logged.
+              </p>
+            )}
           </div>
         </div>
+
 
       </div>
     </div>

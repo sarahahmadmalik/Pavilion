@@ -1,11 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store, subscribeStore, addItem, updateItem, deleteItem, MODULE_STORAGE_MAP } from '../lib/store.js';
+import {
+  fetchGuests,
+  createGuest,
+  updateGuest,
+  deleteGuest
+} from '../lib/supabaseService.js';
+import { store, MODULE_STORAGE_MAP } from '../lib/store.js';
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Calendar, UserCheck } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Calendar, UserCheck, Filter, X } from 'lucide-react';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { SearchableSelect } from '../components/common/SearchableSelect.jsx';
+import { DatePicker } from '../components/common/DatePicker.jsx';
+import { TableLoader } from '../components/common/Loader.jsx';
+import { ALL_COUNTRIES } from '../lib/countries.js';
 
 export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
   const { currentUser, hasModulePermission } = useAuth();
@@ -14,9 +26,12 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
   const canEdit = hasModulePermission('guest_list', 'edit');
   const canDelete = hasModulePermission('guest_list', 'delete');
 
-  const [items, setItems] = useState(store.getGuests());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState('');
   const [countryFilter, setCountryFilter] = useState('All');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -35,26 +50,42 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
 
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
+  const [deletingName, setDeletingName] = useState('');
+
+  const loadData = async () => {
+    setLoading(true);
+    const { data, error } = await fetchGuests();
+    if (!error && data) {
+      setItems(data);
+    } else {
+      // Fallback to local store if db is offline/empty
+      setItems(store.getGuests());
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
-      setItems(store.getGuests());
-    });
-    return unsubscribe;
+    loadData();
   }, []);
 
   if (!canView) return <AccessDenied moduleName="Guest List" />;
 
   const query = (searchQuery || localSearch).toLowerCase();
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(query) ||
-      item.country.toLowerCase().includes(query) ||
-      item.roomAllocated.toLowerCase().includes(query) ||
+    const matchesSearch = (item.name || '').toLowerCase().includes(query) ||
+      (item.country || '').toLowerCase().includes(query) ||
+      (item.roomAllocated || '').toLowerCase().includes(query) ||
       (item.purposeOfStay && item.purposeOfStay.toLowerCase().includes(query));
 
     const matchesCountry = countryFilter === 'All' || item.country === countryFilter;
-    return matchesSearch && matchesCountry;
+    const matchesDateFrom = !dateFrom || item.checkIn >= dateFrom;
+    const matchesDateTo = !dateTo || item.checkIn <= dateTo;
+
+    return matchesSearch && matchesCountry && matchesDateFrom && matchesDateTo;
   });
+
+  // Reset to page 1 on filter change
+  useEffect(() => { setCurrentPage(1); }, [query, countryFilter, dateFrom, dateTo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
@@ -68,7 +99,7 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
       checkIn: new Date().toISOString().split('T')[0],
       checkOut: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
       country: 'Ghana',
-      roomAllocated: 'Room 101',
+      roomAllocated: 'VIP Suite 101',
       purposeOfStay: ''
     });
     setIsSlideOpen(true);
@@ -88,22 +119,37 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
     setIsSlideOpen(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (editingItem) {
-      updateItem(MODULE_STORAGE_MAP.guest_list, 'Guest List', editingItem.id, formData, currentUser, item => item.name);
-      setToast({ type: 'success', message: `Updated guest "${formData.name}" successfully.` });
+      const { data, error } = await updateGuest(editingItem.id, formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: `Updated guest "${formData.name}" successfully.` });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message || 'Failed to update guest record.' });
+      }
     } else {
-      addItem(MODULE_STORAGE_MAP.guest_list, 'Guest List', formData, currentUser, item => item.name);
-      setToast({ type: 'success', message: `Added new guest "${formData.name}" successfully.` });
+      const { data, error } = await createGuest(formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: `Added new guest "${formData.name}" successfully.` });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message || 'Failed to add guest record.' });
+      }
     }
     setIsSlideOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteItem(MODULE_STORAGE_MAP.guest_list, 'Guest List', deletingId, currentUser, item => item.name);
-      setToast({ type: 'success', message: 'Guest record removed successfully.' });
+      const { error } = await deleteGuest(deletingId, deletingName, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Guest record removed successfully.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message || 'Failed to delete record.' });
+      }
       setDeletingId(null);
     }
   };
@@ -116,6 +162,20 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
     { label: 'Room Allocated', key: 'roomAllocated' },
     { label: 'Purpose of Stay', key: 'purposeOfStay' }
   ];
+
+  const countryOptions = [
+    { label: 'All Countries', value: 'All' },
+    ...ALL_COUNTRIES.map(c => ({ label: c, value: c }))
+  ];
+
+  const resetFilters = () => {
+    setCountryFilter('All');
+    setDateFrom('');
+    setDateTo('');
+    setLocalSearch('');
+  };
+
+  const hasActiveFilters = countryFilter !== 'All' || dateFrom || dateTo || localSearch;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -131,29 +191,25 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
           </p>
         </div>
 
-        {/* Action Bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button
             className="btn btn-secondary"
-            onClick={() => triggerExportModal('Guest List', filteredItems, exportColumns)}
-            style={{ color: '#10B981', borderColor: '#10B981' }}
+            onClick={() => triggerExportModal?.('Guest List', filteredItems, exportColumns)}
           >
-            <FileSpreadsheet size={16} /> Export to Google Sheets
+            <FileSpreadsheet size={16} /> Export
           </button>
-
           {canAdd && (
             <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={16} /> + Add New Guest
+              <Plus size={16} /> Add Guest
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar with Date Filters & Searchable Country Filter */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
         padding: '1rem',
@@ -161,38 +217,68 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border-color)'
       }}>
-        <div style={{ position: 'relative', width: '280px' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', minWidth: '220px', flex: 1 }}>
           <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
             className="input-control"
-            placeholder="Search by guest name or room..."
+            placeholder="Search by name, room, purpose..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             style={{ paddingLeft: '2.25rem', fontSize: '0.8125rem' }}
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Country Filter:</span>
-          <select
-            className="input-control"
+        {/* Searchable Country Dropdown */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Country:</span>
+          <SearchableSelect
             value={countryFilter}
-            onChange={(e) => setCountryFilter(e.target.value)}
-            style={{ width: '160px', padding: '0.375rem 0.75rem' }}
-          >
-            <option value="All">All Countries</option>
-            <option value="Ghana">Ghana</option>
-            <option value="United Kingdom">United Kingdom</option>
-            <option value="Pakistan">Pakistan</option>
-            <option value="Nigeria">Nigeria</option>
-            <option value="Canada">Canada</option>
-          </select>
+            onChange={setCountryFilter}
+            options={countryOptions}
+            placeholder="Filter Country"
+            searchPlaceholder="Search country..."
+            style={{ width: '180px' }}
+          />
         </div>
+
+        {/* Check-in Date Range Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>From:</span>
+          <DatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            placeholder="Check-in from"
+            style={{ width: '150px' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>To:</span>
+          <DatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            placeholder="Check-in to"
+            style={{ width: '150px' }}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={resetFilters}
+            className="btn btn-ghost btn-sm"
+            style={{ color: 'var(--status-red-text)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+          >
+            <X size={14} /> Clear Filters
+          </button>
+        )}
       </div>
 
-      {/* Table Data Container */}
-      {paginatedItems.length > 0 ? (
+      {/* Table Content */}
+      {loading ? (
+        <TableLoader rows={6} cols={6} />
+      ) : paginatedItems.length > 0 ? (
         <div className="table-container">
           <table className="data-table">
             <thead>
@@ -202,7 +288,6 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
                 <th>Check Out</th>
                 <th>Country</th>
                 <th>Room Allocated</th>
-                <th>Purpose of Stay</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
@@ -211,30 +296,33 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
                 <tr key={item.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                      <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                        {item.name.charAt(0)}
+                      <div style={{
+                        width: '32px', height: '32px', borderRadius: '50%',
+                        backgroundColor: 'var(--color-primary-light)',
+                        color: 'var(--color-primary)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 700, fontSize: '0.875rem'
+                      }}>
+                        {item.name ? item.name.charAt(0) : 'G'}
                       </div>
                       <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.name}</span>
                     </div>
                   </td>
-                  <td>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8125rem', color: 'var(--text-main)' }}>
-                      <Calendar size={14} color="var(--text-muted)" /> {item.checkIn}
+                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={14} /> {item.checkIn}
                     </span>
                   </td>
-                  <td>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.8125rem', color: 'var(--text-main)' }}>
-                      <Calendar size={14} color="var(--text-muted)" /> {item.checkOut}
+                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <Calendar size={14} /> {item.checkOut}
                     </span>
                   </td>
                   <td>
                     <span className="badge badge-blue">{item.country}</span>
                   </td>
                   <td>
-                    <span style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{item.roomAllocated}</span>
-                  </td>
-                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.purposeOfStay}
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.roomAllocated}</span>
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.375rem' }}>
@@ -247,7 +335,7 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
                         </button>
                       )}
                       {canDelete && (
-                        <button className="btn btn-ghost btn-sm" title="Delete Guest" onClick={() => setDeletingId(item.id)}>
+                        <button className="btn btn-ghost btn-sm" title="Delete Guest" onClick={() => { setDeletingId(item.id); setDeletingName(item.name); }}>
                           <Trash2 size={16} color="#DC2626" />
                         </button>
                       )}
@@ -261,35 +349,26 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
       ) : (
         <EmptyState
           title="No Guests Found"
-          description="No guest records match your search or filter parameters."
+          description="No guest records match your search or filter criteria."
           canAdd={canAdd}
           onAdd={handleOpenAdd}
           addText="Add New Guest"
         />
       )}
 
-      {/* Pagination Footer */}
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0' }}>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            Showing page {currentPage} of {totalPages} ({filteredItems.length} total records)
-          </span>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="btn btn-secondary btn-sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
-              Previous
-            </button>
-            <button className="btn btn-secondary btn-sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredItems.length}
+        itemsPerPage={itemsPerPage}
+      />
 
       {/* SlideOver Form Drawer */}
       <SlideOver
         isOpen={isSlideOpen}
         onClose={() => setIsSlideOpen(false)}
-        title={isViewOnly ? 'Guest Record Details' : editingItem ? 'Edit Guest Information' : 'Add New Guest'}
+        title={isViewOnly ? 'Guest Record Details' : editingItem ? 'Edit Guest Record' : 'Add New Guest Record'}
       >
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
@@ -308,49 +387,31 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Check In Date
-              </label>
-              <input
-                type="date"
-                required
-                disabled={isViewOnly}
-                className="input-control"
-                value={formData.checkIn}
-                onChange={(e) => setFormData({ ...formData, checkIn: e.target.value })}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Check Out Date
-              </label>
-              <input
-                type="date"
-                required
-                disabled={isViewOnly}
-                className="input-control"
-                value={formData.checkOut}
-                onChange={(e) => setFormData({ ...formData, checkOut: e.target.value })}
-              />
-            </div>
+            <DatePicker
+              label="Check In Date"
+              value={formData.checkIn}
+              onChange={v => setFormData({ ...formData, checkIn: v })}
+              disabled={isViewOnly}
+            />
+            <DatePicker
+              label="Check Out Date"
+              value={formData.checkOut}
+              onChange={v => setFormData({ ...formData, checkOut: v })}
+              disabled={isViewOnly}
+            />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Country of Origin
-              </label>
-              <input
-                type="text"
-                required
-                disabled={isViewOnly}
-                className="input-control"
-                value={formData.country}
-                onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                placeholder="e.g. United Kingdom"
-              />
-            </div>
+            <SearchableSelect
+              label="Country of Origin"
+              value={formData.country}
+              onChange={v => setFormData({ ...formData, country: v })}
+              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+              disabled={isViewOnly}
+              placeholder="Select Country"
+              searchPlaceholder="Search country..."
+            />
+
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
                 Room Allocated
@@ -377,7 +438,7 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
               className="input-control"
               value={formData.purposeOfStay}
               onChange={(e) => setFormData({ ...formData, purposeOfStay: e.target.value })}
-              placeholder="e.g. Annual Conference & Delegation Inspection"
+              placeholder="e.g. Annual Conference & Delegation Inspection Tour"
             />
           </div>
 
@@ -400,7 +461,7 @@ export const GuestList = ({ searchQuery, triggerExportModal, setToast }) => {
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
         title="Delete Guest Record"
-        message="Are you sure you want to delete this guest record from the system database?"
+        message={`Are you sure you want to delete the guest record for "${deletingName}"?`}
       />
     </div>
   );

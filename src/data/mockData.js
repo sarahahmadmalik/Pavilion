@@ -7,7 +7,7 @@ export const INITIAL_USERS = [
     email: 'superadmin@mtaghana.org',
     role: 'super_admin',
     status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    avatar: null,
     lastLogin: '2026-08-04 14:32',
     permissions: {
       guest_list: { view: true, add: true, edit: true, delete: true },
@@ -24,7 +24,7 @@ export const INITIAL_USERS = [
     email: 'admin@mtaghana.org',
     role: 'admin',
     status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    avatar: null,
     lastLogin: '2026-08-04 11:15',
     permissions: {
       guest_list: { view: true, add: true, edit: true, delete: true },
@@ -41,7 +41,7 @@ export const INITIAL_USERS = [
     email: 'staff@mtaghana.org',
     role: 'staff',
     status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+    avatar: null,
     lastLogin: '2026-08-03 09:45',
     permissions: {
       guest_list: { view: true, add: true, edit: true, delete: false },

@@ -8,6 +8,8 @@ import { GoogleSheetsViewerModal } from '../common/GoogleSheetsViewerModal.jsx';
 import { PageTransition } from '../common/PageTransition.jsx';
 import { Clock } from 'lucide-react';
 import { store } from '../../lib/store.js';
+import { exportToExcel } from '../../lib/exportUtils.js';
+import { supabase } from '../../lib/supabase.js';
 
 export const Layout = ({ activePage, setActivePage, children }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -36,24 +38,100 @@ export const Layout = ({ activePage, setActivePage, children }) => {
     setExportState({ isOpen: true, moduleTitle, data, columns });
   };
 
-  const handleConfirmExport = (option) => {
-    const exportedData = option === 'all' ? exportState.data : exportState.data.slice(0, 10);
-    setToast({
-      type: 'success',
-      message: `Exported ${exportedData.length} records successfully to Google Sheets!`,
-      linkText: 'Open in Google Sheets',
-      onLinkClick: () => {
-        setSheetsState({
-          isOpen: true,
-          data: exportedData,
-          columns: exportState.columns,
-          title: `MTA Ghana - ${exportState.moduleTitle}`
+  const handleConfirmExport = async (config) => {
+    const { scope, method, webhookUrl } = config;
+    // For 'filtered', we currently just take a mock slice. In a real implementation, 
+    // we would pass the actual filtered data from the page state. 
+    // To implement properly, components should pass `filteredData` to `triggerExportModal`.
+    const exportedData = scope === 'all' ? exportState.data : exportState.data.slice(0, 10);
+
+    if (method === 'excel') {
+      const filename = exportToExcel(exportState.moduleTitle, exportedData, exportState.columns);
+      setToast({ type: 'success', message: `✓ ${filename} downloaded successfully.` });
+    } else if (method === 'sheets') {
+      try {
+        setToast({ type: 'info', message: 'Sending data to Google Sheets...' });
+        
+        // This makes an actual POST request to the provided webhook URL
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          mode: 'no-cors', // Google Apps Script webhooks often require no-cors for simple posts
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            title: exportState.moduleTitle,
+            columns: exportState.columns.map(c => c.label),
+            data: exportedData.map(row => exportState.columns.map(c => row[c.key]))
+          })
         });
+
+        setToast({ type: 'success', message: '✓ Data successfully sent to Google Sheets.' });
+      } catch (err) {
+        console.error('Webhook error:', err);
+        setToast({ type: 'error', message: '✕ Failed to send data to Google Sheets.' });
       }
-    });
+    }
   };
 
-  const activityLogs = store.getActivityLogs().slice(0, 8);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch initial activity logs & subscribe to real-time changes
+  React.useEffect(() => {
+    let channel;
+    const fetchLogs = async () => {
+      const { data } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(10);
+      if (data) {
+        setNotifications(data.map(d => ({
+          id: d.id,
+          userName: d.user_name,
+          userAvatar: d.user_avatar,
+          action: d.action,
+          recordAffected: d.record_affected,
+          moduleName: d.module_name,
+          timestamp: d.timestamp ? new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'
+        })));
+      }
+    };
+
+    fetchLogs();
+
+    // Supabase Real-time Notification Subscription
+    channel = supabase
+      .channel('realtime_activity_logs')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'activity_logs' },
+        (payload) => {
+          const newRow = payload.new;
+          const newNotif = {
+            id: newRow.id,
+            userName: newRow.user_name,
+            userAvatar: newRow.user_avatar,
+            action: newRow.action,
+            recordAffected: newRow.record_affected,
+            moduleName: newRow.module_name,
+            timestamp: 'Just now'
+          };
+          setNotifications(prev => [newNotif, ...prev.slice(0, 9)]);
+          setUnreadCount(count => count + 1);
+          setToast({
+            type: 'info',
+            message: `⚡ Real-time Activity: ${newRow.user_name} ${newRow.action.toLowerCase()} "${newRow.record_affected}" in ${newRow.module_name}`
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-page)' }}>
@@ -74,7 +152,11 @@ export const Layout = ({ activePage, setActivePage, children }) => {
           setActivePage={setActivePage}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
-          onOpenNotifications={() => setShowNotifications(true)}
+          unreadCount={unreadCount}
+          onOpenNotifications={() => {
+            setShowNotifications(true);
+            setUnreadCount(0);
+          }}
           onToggleMobileSidebar={() => setIsMobileOpen(!isMobileOpen)}
         />
 
@@ -93,7 +175,7 @@ export const Layout = ({ activePage, setActivePage, children }) => {
           color: 'var(--text-muted)',
           backgroundColor: 'var(--bg-card)'
         }}>
-          <span>MTA Ghana © 2026 Majlis-e-Ahmadiyya Institutional Portal • All Rights Reserved</span>
+          <span>MTA Ghana © 2026 • All Rights Reserved</span>
         </footer>
       </div>
 
@@ -105,7 +187,7 @@ export const Layout = ({ activePage, setActivePage, children }) => {
         width="420px"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          {activityLogs.map((log) => (
+          {notifications.map((log) => (
             <div key={log.id} style={{
               display: 'flex',
               gap: '0.875rem',
@@ -115,7 +197,7 @@ export const Layout = ({ activePage, setActivePage, children }) => {
               border: '1px solid var(--border-color)'
             }}>
               <img
-                src={log.userAvatar}
+                src={log.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
                 alt={log.userName}
                 style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
               />
@@ -125,14 +207,14 @@ export const Layout = ({ activePage, setActivePage, children }) => {
                     {log.userName}
                   </span>
                   <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '2px' }}>
-                    <Clock size={12} /> {log.timestamp.split(' ')[1]}
+                    <Clock size={12} /> {log.timestamp}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.8125rem', color: 'var(--text-main)', marginTop: '2px' }}>
                   {log.action} <span style={{ fontWeight: 600 }}>{log.recordAffected}</span>
                 </p>
                 <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)', display: 'inline-block', marginTop: '4px' }}>
-                  Module: {log.moduleName}
+                  {log.moduleName}
                 </span>
               </div>
             </div>

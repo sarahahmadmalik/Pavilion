@@ -15,9 +15,9 @@ import {
   X
 } from 'lucide-react';
 
-const ACTIVE_COLOR   = '#38BDF8';
-const ACTIVE_BG      = 'rgba(56, 189, 248, 0.10)';
-const INACTIVE_COLOR = '#5D6A85';
+const ACTIVE_COLOR   = '#4B7FE8';          // bright readable blue on dark bg
+const ACTIVE_BG      = 'rgba(75, 127, 232, 0.14)';
+const INACTIVE_COLOR = '#6B7A99';
 
 export const Sidebar = ({
   activePage,
@@ -88,72 +88,69 @@ export const Sidebar = ({
       >
 
         {/* ── Logo Header ── */}
-        <div
-          style={{
-            height: '80px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
-            padding: isCollapsed ? '0' : '0 1rem',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            flexShrink: 0,
-            position: 'relative',
-            gap: '0.75rem'
-          }}
-        >
-          {/* Logo — hover reveals expand/collapse icon overlay */}
+        <div style={{
+          height: '80px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          padding: isCollapsed ? '0 0.5rem' : '0 0.75rem',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          flexShrink: 0,
+          gap: '0.625rem',
+          position: 'relative'
+        }}>
+          {/* Logo container */}
           <div
             onMouseEnter={() => setLogoHovered(true)}
             onMouseLeave={() => setLogoHovered(false)}
-            onClick={() => setIsCollapsed(!isCollapsed)}
+            onClick={() => { if (isCollapsed) setIsCollapsed(false); }}
             style={{
               position: 'relative',
-              width: '52px',
-              height: '52px',
-              cursor: 'pointer',
+              width: '48px',
+              height: '48px',
+              cursor: isCollapsed ? 'pointer' : 'default',
               flexShrink: 0
             }}
-            title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+            title={isCollapsed ? 'Expand Sidebar' : undefined}
           >
             <img
               src="/logo.png"
               alt="MTA Ghana"
               style={{
-                width: '52px',
-                height: '52px',
+                width: '48px',
+                height: '48px',
                 objectFit: 'contain',
                 borderRadius: '50%',
                 backgroundColor: '#FFFFFF',
                 padding: '3px',
-                display: 'block',
-                transition: 'opacity 0.18s ease'
+                display: 'block'
               }}
             />
-            {/* Hover overlay: shows arrow */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                borderRadius: '50%',
-                backgroundColor: 'rgba(8, 12, 28, 0.70)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: logoHovered ? 1 : 0,
-                transition: 'opacity 0.18s ease',
-                pointerEvents: 'none'
-              }}
-            >
-              {isCollapsed
-                ? <ChevronRight size={20} color="#38BDF8" strokeWidth={2.5} />
-                : <ChevronLeft  size={20} color="#38BDF8" strokeWidth={2.5} />
-              }
-            </div>
+
+            {/* Hover overlay on logo ONLY when collapsed */}
+            {isCollapsed && (
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(8, 12, 28, 0.75)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: logoHovered ? 1 : 0,
+                  transition: 'opacity 0.18s ease',
+                  pointerEvents: 'none'
+                }}
+              >
+                <ChevronRight size={18} color="#4B7FE8" strokeWidth={2.5} />
+              </div>
+            )}
           </div>
 
-          {/* Text: MTA Ghana + Operations Panel — visible when expanded */}
+          {/* Text — visible when expanded */}
           {!isCollapsed && (
-            <div style={{ overflow: 'hidden' }}>
+            <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
               <p style={{
                 fontSize: '0.9375rem',
                 fontWeight: 800,
@@ -167,7 +164,7 @@ export const Sidebar = ({
               <p style={{
                 fontSize: '0.6875rem',
                 fontWeight: 500,
-                color: '#38BDF8',
+                color: '#4B7FE8',
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
                 marginTop: '2px',
@@ -178,11 +175,46 @@ export const Sidebar = ({
             </div>
           )}
 
-          {/* Mobile close button */}
-          {!isCollapsed && isMobileOpen && (
+          {/* Collapse button on right side when expanded */}
+          {!isCollapsed && !isMobileOpen && (
+            <button
+              onClick={() => setIsCollapsed(true)}
+              title="Collapse Sidebar"
+              style={{
+                flexShrink: 0,
+                width: '24px',
+                height: '24px',
+                borderRadius: '6px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: '#6B7A99',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+                marginLeft: 'auto'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(75,127,232,0.18)';
+                e.currentTarget.style.color = '#4B7FE8';
+                e.currentTarget.style.borderColor = 'rgba(75,127,232,0.35)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                e.currentTarget.style.color = '#6B7A99';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+              }}
+            >
+              <ChevronLeft size={14} strokeWidth={2.5} />
+            </button>
+          )}
+
+
+          {/* Mobile close */}
+          {isMobileOpen && (
             <button
               onClick={() => setIsMobileOpen(false)}
-              className="mobile-only-btn"
               style={{
                 background: 'none', border: 'none',
                 color: '#5D6A85', cursor: 'pointer',

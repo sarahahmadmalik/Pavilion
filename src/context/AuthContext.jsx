@@ -1,67 +1,140 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { store, subscribeStore } from '../lib/store.js';
+import { supabase } from '../lib/supabase.js';
+import { fetchUserProfile, fetchAllUsers } from '../lib/supabaseService.js';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [users, setUsers] = useState(store.getUsers());
-  const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('mta_ghana_active_user_id');
-    const allUsers = store.getUsers();
-    return allUsers.find(u => u.id === saved) || allUsers[0]; // Default Super Admin
-  });
+  const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [authLoading, setAuthLoading] = useState(true); // initial session check
 
+  // ── Bootstrap: restore session on page load ─────────────────────────────
   useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
-      const updatedUsers = store.getUsers();
-      setUsers(updatedUsers);
-      if (currentUser) {
-        const refreshed = updatedUsers.find(u => u.id === currentUser.id);
-        if (refreshed) setCurrentUser(refreshed);
+    let mounted = true;
+
+    const initSession = async () => {
+      setAuthLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user && mounted) {
+        await loadUserProfile(session.user.id);
       }
+      if (mounted) setAuthLoading(false);
+    };
+
+    initSession();
+
+    // Listen for auth state changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      if (event === 'SIGNED_IN' && session?.user) {
+        await loadUserProfile(session.user.id);
+      } else if (event === 'SIGNED_OUT') {
+        setCurrentUser(null);
+        setUsers([]);
+      }
+      setAuthLoading(false);
     });
-    return unsubscribe;
-  }, [currentUser]);
 
-  const login = (email, password) => {
-    const found = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (found) {
-      if (found.status === 'Inactive') {
-        return { success: false, message: 'Account is inactive. Please contact Super Admin.' };
+    return () => {
+      mounted = false;
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const loadUserProfile = async (authUserId) => {
+    const { data, error } = await fetchUserProfile(authUserId);
+    if (!error && data) {
+      setCurrentUser(data);
+      // Load all users for admin/super-admin panels
+      if (data.role !== 'staff') {
+        const { data: allUsers } = await fetchAllUsers();
+        setUsers(allUsers || []);
       }
-      setCurrentUser(found);
-      localStorage.setItem('mta_ghana_active_user_id', found.id);
-      return { success: true, user: found };
     }
-    return { success: false, message: 'Invalid credentials. Please check email and password.' };
   };
 
-  const logout = () => {
+  // ── Login via Supabase Auth ──────────────────────────────────────────────
+  const login = async (email, password) => {
+    try {
+      // 1. Pre-check if email exists in public.users
+      const { data: userRecords, error: checkErr } = await supabase
+        .from('users')
+        .select('email, role, id')
+        .ilike('email', email);
+        
+      if (!checkErr && (!userRecords || userRecords.length === 0)) {
+        return { success: false, message: 'Account with this email does not exist.' };
+      }
+
+      // 2. Attempt Supabase Auth Login
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) {
+        let msg = error.message;
+        if (typeof msg === 'object') msg = 'Invalid credentials.';
+        
+        // Handle specific Supabase Auth errors
+        if (error.status === 500) {
+           msg = 'Server Error (500): The authentication database is currently unreachable or corrupted.';
+        } else if (msg === '{}' || msg === '[object Object]' || !msg || msg.includes('Invalid login credentials')) {
+           msg = 'Invalid password. Please try again.';
+        } else if (msg === 'Failed to fetch') {
+           msg = 'Network error: Cannot connect to authentication server.';
+        }
+        return { success: false, message: msg };
+      }
+      
+      // 3. Permissions check
+      if (data?.user) {
+        const { data: profile } = await fetchUserProfile(data.user.id);
+        if (profile && profile.role === 'staff') {
+           // Verify they have at least one permission
+           const perms = profile.permissions;
+           if (!perms || Object.keys(perms).length === 0) {
+              await supabase.auth.signOut();
+              return { success: false, message: 'Your account has no permissions set up. Please contact an administrator.' };
+           }
+        }
+      }
+
+      return { success: true, user: data.user };
+    } catch (err) {
+      return { success: false, message: 'An unexpected error occurred during login.' };
+    }
+  };
+
+  // ── Logout ───────────────────────────────────────────────────────────────
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
-    localStorage.removeItem('mta_ghana_active_user_id');
+    setUsers([]);
   };
 
-  // Demo helper to quickly switch roles (Super Admin, Admin, Staff)
-  const switchRole = (targetRole) => {
-    const target = users.find(u => u.role === targetRole && u.status === 'Active');
-    if (target) {
-      setCurrentUser(target);
-      localStorage.setItem('mta_ghana_active_user_id', target.id);
-    }
+  // ── Refresh users list (call after user CRUD) ────────────────────────────
+  const refreshUsers = async () => {
+    const { data } = await fetchAllUsers();
+    setUsers(data || []);
   };
 
-  // Granular Permission Check
+  // ── Refresh own profile ──────────────────────────────────────────────────
+  const refreshProfile = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) await loadUserProfile(session.user.id);
+  };
+
+  // ── Granular permission check ────────────────────────────────────────────
   const hasModulePermission = (moduleKey, action = 'view') => {
     if (!currentUser) return false;
     if (currentUser.role === 'super_admin') return true;
 
-    // Admin has access to all 6 modules & activity log, but NOT user management
+    // Admin: all modules except user_management
     if (currentUser.role === 'admin') {
       if (moduleKey === 'user_management') return false;
       return true;
     }
 
-    // Staff role permission evaluation
+    // Staff: check per-module permissions
     if (currentUser.role === 'staff') {
       if (moduleKey === 'user_management' || moduleKey === 'activity_log') return false;
       const modPerms = currentUser.permissions?.[moduleKey];
@@ -76,9 +149,11 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       currentUser,
       users,
+      authLoading,
       login,
       logout,
-      switchRole,
+      refreshUsers,
+      refreshProfile,
       hasModulePermission
     }}>
       {children}
@@ -88,8 +163,6 @@ export const AuthProvider = ({ children }) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
 };

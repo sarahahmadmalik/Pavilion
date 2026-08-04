@@ -1,14 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_PROJECT_ID = 'yblsagikbnaznrgjuvjz';
-const DEFAULT_URL = `https://${SUPABASE_PROJECT_ID}.supabase.co`;
-const DEFAULT_ANON_KEY = 'sb_publishable_6RsBrUAxCJr6K7-pGEhHYA_ZklIRiwF';
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || DEFAULT_URL;
-export const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_ANON_KEY;
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) are missing in .env!');
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
 export const isSupabaseConfigured = () => {
-  return true; // Configured with live MTA Ghana Supabase Project ID: yblsagikbnaznrgjuvjz
+  return !!(supabaseUrl && supabaseAnonKey);
 };
+

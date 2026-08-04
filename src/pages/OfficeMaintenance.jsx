@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store, subscribeStore, addItem, updateItem, deleteItem, MODULE_STORAGE_MAP } from '../lib/store.js';
+import {
+  fetchOfficeMaintenance,
+  createOfficeMaintenance,
+  updateOfficeMaintenance,
+  deleteOfficeMaintenance
+} from '../lib/supabaseService.js';
+import { store, MODULE_STORAGE_MAP } from '../lib/store.js';
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Wrench } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Wrench, X } from 'lucide-react';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { DatePicker } from '../components/common/DatePicker.jsx';
+import { TableLoader } from '../components/common/Loader.jsx';
 
 export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast }) => {
   const { currentUser, hasModulePermission } = useAuth();
@@ -15,12 +25,18 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
   const canEdit = hasModulePermission('office_maintenance', 'edit');
   const canDelete = hasModulePermission('office_maintenance', 'delete');
 
-  const [items, setItems] = useState(store.getOfficeMaintenance());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minCost, setMinCost] = useState('');
+  const [maxCost, setMaxCost] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  // SlideOver Form State
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
@@ -34,27 +50,45 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
     cost: 0
   });
 
+  // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
+  const loadData = async () => {
+    setLoading(true);
+    const { data, error } = await fetchOfficeMaintenance();
+    if (!error && data) {
+      setItems(data);
+    } else {
       setItems(store.getOfficeMaintenance());
-    });
-    return unsubscribe;
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   if (!canView) return <AccessDenied moduleName="Office Maintenance" />;
 
   const query = (searchQuery || localSearch).toLowerCase();
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.issue.toLowerCase().includes(query) ||
-      item.location.toLowerCase().includes(query) ||
+    const matchesSearch = (item.issue || '').toLowerCase().includes(query) ||
+      (item.location || '').toLowerCase().includes(query) ||
       (item.nameOfWorker && item.nameOfWorker.toLowerCase().includes(query));
 
     const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesDateFrom = !dateFrom || item.reportedOn >= dateFrom;
+    const matchesDateTo = !dateTo || item.reportedOn <= dateTo;
+    const matchesMinCost = !minCost || Number(item.cost) >= Number(minCost);
+    const matchesMaxCost = !maxCost || Number(item.cost) <= Number(maxCost);
+
+    return matchesSearch && matchesStatus && matchesDateFrom && matchesDateTo && matchesMinCost && matchesMaxCost;
   });
 
+  // Reset to page 1 on filter change
+  useEffect(() => { setCurrentPage(1); }, [query, statusFilter, dateFrom, dateTo, minCost, maxCost]);
+
+  // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -66,7 +100,7 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
       issue: '',
       status: 'Open',
       updates: '',
-      location: 'Administration Compound',
+      location: 'Central Headquarters',
       nameOfWorker: '',
       cost: 0
     });
@@ -87,65 +121,95 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
     setIsSlideOpen(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (editingItem) {
-      updateItem(MODULE_STORAGE_MAP.office_maintenance, 'Office Maintenance', editingItem.id, formData, currentUser, item => item.issue);
-      setToast({ type: 'success', message: 'Office maintenance record updated.' });
+      const { error } = await updateOfficeMaintenance(editingItem.id, formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Office maintenance record updated.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     } else {
-      addItem(MODULE_STORAGE_MAP.office_maintenance, 'Office Maintenance', formData, currentUser, item => item.issue);
-      setToast({ type: 'success', message: 'Logged office maintenance request.' });
+      const { error } = await createOfficeMaintenance(formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Reported new office maintenance issue.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     }
     setIsSlideOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteItem(MODULE_STORAGE_MAP.office_maintenance, 'Office Maintenance', deletingId, currentUser, item => item.issue);
-      setToast({ type: 'success', message: 'Office maintenance record deleted.' });
+      const itemToDelete = items.find(i => i.id === deletingId);
+      const { error } = await deleteOfficeMaintenance(deletingId, itemToDelete?.issue, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Maintenance record removed.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
       setDeletingId(null);
     }
   };
 
   const exportColumns = [
     { label: 'Reported On', key: 'reportedOn' },
-    { label: 'Issue', key: 'issue' },
+    { label: 'Issue Description', key: 'issue' },
     { label: 'Status', key: 'status' },
-    { label: 'Updates', key: 'updates' },
     { label: 'Location', key: 'location' },
-    { label: 'Worker Name', key: 'nameOfWorker' },
+    { label: 'Worker / Engineer', key: 'nameOfWorker' },
     { label: 'Cost (GHS)', key: 'cost' }
   ];
+
+  const resetFilters = () => {
+    setStatusFilter('All');
+    setDateFrom('');
+    setDateTo('');
+    setMinCost('');
+    setMaxCost('');
+    setLocalSearch('');
+  };
+
+  const hasActiveFilters = statusFilter !== 'All' || dateFrom || dateTo || minCost || maxCost || localSearch;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            Office Maintenance
+            Office Facilities & Generator Maintenance
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Manage standby generator servicing, conference audio visual systems, and facility upkeep.
+            Track office electrical, plumbing, generator servicing, and building infrastructure repairs.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={() => triggerExportModal('Office Maintenance', filteredItems, exportColumns)} style={{ color: '#10B981', borderColor: '#10B981' }}>
-            <FileSpreadsheet size={16} /> Export to Google Sheets
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => triggerExportModal?.('Office Maintenance', filteredItems, exportColumns)}
+          >
+            <FileSpreadsheet size={16} /> Export
           </button>
           {canAdd && (
             <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={16} /> + Report Office Issue
+              <Plus size={16} /> Report Issue
             </button>
           )}
         </div>
       </div>
 
+      {/* Comprehensive Filter Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
         padding: '1rem',
@@ -153,7 +217,8 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border-color)'
       }}>
-        <div style={{ position: 'relative', width: '280px' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', minWidth: '200px', flex: 1 }}>
           <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
@@ -165,23 +230,83 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Status:</span>
-          <select
-            className="input-control"
+          <CustomSelect
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ width: '150px', padding: '0.375rem 0.75rem' }}
-          >
-            <option value="All">All Statuses</option>
-            <option value="Open">Open</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Resolved">Resolved</option>
-          </select>
+            onChange={setStatusFilter}
+            options={[
+              { label: 'All Statuses', value: 'All' },
+              { label: 'Open', value: 'Open' },
+              { label: 'In Progress', value: 'In Progress' },
+              { label: 'Resolved', value: 'Resolved' }
+            ]}
+            style={{ width: '150px' }}
+          />
         </div>
+
+        {/* Date Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>From:</span>
+          <DatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            placeholder="Date from"
+            style={{ width: '140px' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>To:</span>
+          <DatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            placeholder="Date to"
+            style={{ width: '140px' }}
+          />
+        </div>
+
+        {/* Cost Range Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Min GHS:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Min"
+            value={minCost}
+            onChange={e => setMinCost(e.target.value)}
+            style={{ width: '90px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Max GHS:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Max"
+            value={maxCost}
+            onChange={e => setMaxCost(e.target.value)}
+            style={{ width: '90px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={resetFilters}
+            className="btn btn-ghost btn-sm"
+            style={{ color: 'var(--status-red-text)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+          >
+            <X size={14} /> Clear
+          </button>
+        )}
       </div>
 
-      {paginatedItems.length > 0 ? (
+      {/* Data Table */}
+      {loading ? (
+        <TableLoader rows={6} cols={7} />
+      ) : paginatedItems.length > 0 ? (
         <div className="table-container">
           <table className="data-table">
             <thead>
@@ -243,25 +368,27 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
         />
       )}
 
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredItems.length}
+        itemsPerPage={itemsPerPage}
+      />
+
+      {/* SlideOver Form Drawer */}
       <SlideOver
         isOpen={isSlideOpen}
         onClose={() => setIsSlideOpen(false)}
         title={isViewOnly ? 'Office Maintenance Details' : editingItem ? 'Edit Maintenance Record' : 'Report Office Maintenance'}
       >
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Reported On Date
-            </label>
-            <input
-              type="date"
-              required
-              disabled={isViewOnly}
-              className="input-control"
-              value={formData.reportedOn}
-              onChange={(e) => setFormData({ ...formData, reportedOn: e.target.value })}
-            />
-          </div>
+          <DatePicker
+            label="Reported On Date"
+            value={formData.reportedOn}
+            onChange={v => setFormData({ ...formData, reportedOn: v })}
+            disabled={isViewOnly}
+          />
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
@@ -279,21 +406,17 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Status
-              </label>
-              <select
-                disabled={isViewOnly}
-                className="input-control"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              >
-                <option value="Open">Open</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Resolved">Resolved</option>
-              </select>
-            </div>
+            <CustomSelect
+              label="Status"
+              value={formData.status}
+              onChange={v => setFormData({ ...formData, status: v })}
+              disabled={isViewOnly}
+              options={[
+                { label: 'Open', value: 'Open' },
+                { label: 'In Progress', value: 'In Progress' },
+                { label: 'Resolved', value: 'Resolved' }
+              ]}
+            />
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
                 Cost (GHS)
@@ -320,34 +443,35 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
               className="input-control"
               value={formData.location}
               onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-              placeholder="e.g. Main Compound Generator Station"
+              placeholder="e.g. Generator House / Server Room"
             />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Worker / Engineering Firm
+              Engineer / Contractor Name
             </label>
             <input
               type="text"
               disabled={isViewOnly}
               className="input-control"
-              value={formData.nameOfWorker}
+              value={formData.nameOfWorker || ''}
               onChange={(e) => setFormData({ ...formData, nameOfWorker: e.target.value })}
-              placeholder="e.g. Mantrac Ghana Engineers"
+              placeholder="e.g. Mantrac Ghana Services"
             />
           </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Updates
+              Service Updates / Notes
             </label>
             <textarea
               rows={3}
               disabled={isViewOnly}
               className="input-control"
-              value={formData.updates}
+              value={formData.updates || ''}
               onChange={(e) => setFormData({ ...formData, updates: e.target.value })}
+              placeholder="e.g. Oil filter and fuel filters replaced."
             />
           </div>
 
@@ -364,12 +488,13 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
         </form>
       </SlideOver>
 
+      {/* Delete Dialog */}
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
-        title="Delete Office Maintenance Issue"
-        message="Are you sure you want to delete this office maintenance record?"
+        title="Delete Office Maintenance Record"
+        message="Are you sure you want to delete this record?"
       />
     </div>
   );

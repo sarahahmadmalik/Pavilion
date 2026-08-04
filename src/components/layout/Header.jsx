@@ -33,7 +33,7 @@ const ROLE_ICONS = {
   staff: <User size={13} />
 };
 
-export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery, onOpenNotifications, onToggleMobileSidebar }) => {
+export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery, unreadCount, onOpenNotifications, onToggleMobileSidebar }) => {
   const { currentUser, logout, switchRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
@@ -75,10 +75,11 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
         {isDashboard ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{
-              fontSize: '1rem',
-              fontWeight: 700,
+              fontSize: '1.375rem',
+              fontWeight: 800,
               color: 'var(--text-main)',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
+              letterSpacing: '-0.02em'
             }}>
               Welcome back, {firstName}
             </span>
@@ -119,15 +120,26 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
           title="Notifications"
         >
           <Bell size={18} color="var(--text-muted)" />
-          <span style={{
-            position: 'absolute',
-            top: '4px',
-            right: '4px',
-            width: '8px',
-            height: '8px',
-            backgroundColor: '#EF4444',
-            borderRadius: '50%'
-          }}></span>
+          {unreadCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '2px',
+              right: '2px',
+              minWidth: '16px',
+              height: '16px',
+              backgroundColor: '#EF4444',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'white',
+              fontSize: '0.625rem',
+              fontWeight: 'bold',
+              padding: '0 4px'
+            }}>
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
         </button>
 
         {/* User Profile Avatar Dropdown */}
@@ -220,47 +232,6 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
 
             <DropdownDivider />
 
-            {/* Switch Role section — demo utility */}
-            <div style={{ padding: '0.25rem 0.75rem', marginBottom: '0.125rem' }}>
-              <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                Switch Demo Role
-              </span>
-            </div>
-
-            {['super_admin', 'admin', 'staff'].map(r => (
-              <button
-                key={r}
-                onClick={() => { switchRole(r); setShowProfileMenu(false); }}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '0.5rem',
-                  padding: '0.4375rem 0.75rem',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  background: currentUser?.role === r ? 'var(--color-primary-light)' : 'none',
-                  color: currentUser?.role === r ? 'var(--color-primary)' : 'var(--text-main)',
-                  fontSize: '0.8125rem',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontFamily: 'inherit',
-                  fontWeight: currentUser?.role === r ? 700 : 400,
-                  transition: 'background 0.12s ease'
-                }}
-                onMouseEnter={e => { if (currentUser?.role !== r) e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'; }}
-                onMouseLeave={e => { if (currentUser?.role !== r) e.currentTarget.style.backgroundColor = 'transparent'; }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  {ROLE_ICONS[r]}
-                  {ROLE_LABELS[r]}
-                </span>
-                {currentUser?.role === r && <ChevronRight size={13} />}
-              </button>
-            ))}
-
-            <DropdownDivider />
 
             <DropdownItem
               icon={<Settings />}

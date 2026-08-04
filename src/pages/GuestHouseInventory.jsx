@@ -1,12 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store, subscribeStore, addItem, updateItem, deleteItem, MODULE_STORAGE_MAP } from '../lib/store.js';
+import {
+  fetchGHInventory,
+  createGHInventory,
+  updateGHInventory,
+  deleteGHInventory
+} from '../lib/supabaseService.js';
+import { store, MODULE_STORAGE_MAP } from '../lib/store.js';
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Package } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Package, X } from 'lucide-react';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { TableLoader } from '../components/common/Loader.jsx';
 
 export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast }) => {
   const { currentUser, hasModulePermission } = useAuth();
@@ -15,12 +24,16 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
   const canEdit = hasModulePermission('gh_inventory', 'edit');
   const canDelete = hasModulePermission('gh_inventory', 'delete');
 
-  const [items, setItems] = useState(store.getGHInventory());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState('');
   const [conditionFilter, setConditionFilter] = useState('All');
+  const [minQty, setMinQty] = useState('');
+  const [maxQty, setMaxQty] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  // SlideOver Form State
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
@@ -32,27 +45,43 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
     notes: ''
   });
 
+  // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
+  const loadData = async () => {
+    setLoading(true);
+    const { data, error } = await fetchGHInventory();
+    if (!error && data) {
+      setItems(data);
+    } else {
       setItems(store.getGHInventory());
-    });
-    return unsubscribe;
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   if (!canView) return <AccessDenied moduleName="Guest House Inventory" />;
 
   const query = (searchQuery || localSearch).toLowerCase();
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.item.toLowerCase().includes(query) ||
-      item.location.toLowerCase().includes(query) ||
+    const matchesSearch = (item.item || '').toLowerCase().includes(query) ||
+      (item.location || '').toLowerCase().includes(query) ||
       (item.notes && item.notes.toLowerCase().includes(query));
 
     const matchesCondition = conditionFilter === 'All' || item.condition === conditionFilter;
-    return matchesSearch && matchesCondition;
+    const matchesMinQty = !minQty || Number(item.qty) >= Number(minQty);
+    const matchesMaxQty = !maxQty || Number(item.qty) <= Number(maxQty);
+
+    return matchesSearch && matchesCondition && matchesMinQty && matchesMaxQty;
   });
 
+  // Reset to page 1 on filter change
+  useEffect(() => { setCurrentPage(1); }, [query, conditionFilter, minQty, maxQty]);
+
+  // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -63,7 +92,7 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
       item: '',
       qty: 1,
       condition: 'Good',
-      location: 'Guest Rooms',
+      location: 'Main Linen Store',
       notes: ''
     });
     setIsSlideOpen(true);
@@ -83,22 +112,38 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
     setIsSlideOpen(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (editingItem) {
-      updateItem(MODULE_STORAGE_MAP.gh_inventory, 'Guest House Inventory', editingItem.id, formData, currentUser, item => item.item);
-      setToast({ type: 'success', message: `Updated inventory item "${formData.item}".` });
+      const { error } = await updateGHInventory(editingItem.id, formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: `Updated inventory item "${formData.item}".` });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     } else {
-      addItem(MODULE_STORAGE_MAP.gh_inventory, 'Guest House Inventory', formData, currentUser, item => item.item);
-      setToast({ type: 'success', message: `Added new item "${formData.item}".` });
+      const { error } = await createGHInventory(formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: `Added "${formData.item}" to inventory.` });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     }
     setIsSlideOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteItem(MODULE_STORAGE_MAP.gh_inventory, 'Guest House Inventory', deletingId, currentUser, item => item.item);
-      setToast({ type: 'success', message: 'Inventory item deleted.' });
+      const itemToDelete = items.find(i => i.id === deletingId);
+      const { error } = await deleteGHInventory(deletingId, itemToDelete?.item, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Inventory item deleted.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
       setDeletingId(null);
     }
   };
@@ -111,35 +156,48 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
     { label: 'Notes', key: 'notes' }
   ];
 
+  const resetFilters = () => {
+    setConditionFilter('All');
+    setMinQty('');
+    setMaxQty('');
+    setLocalSearch('');
+  };
+
+  const hasActiveFilters = conditionFilter !== 'All' || minQty || maxQty || localSearch;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
             Guest House Inventory
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Catalogue guest house furniture, appliances, linen, and operational stock.
+            Monitor guest house assets, furniture, appliances, linens, and condition status.
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={() => triggerExportModal('Guest House Inventory', filteredItems, exportColumns)} style={{ color: '#10B981', borderColor: '#10B981' }}>
-            <FileSpreadsheet size={16} /> Export to Google Sheets
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => triggerExportModal?.('Guest House Inventory', filteredItems, exportColumns)}
+          >
+            <FileSpreadsheet size={16} /> Export
           </button>
           {canAdd && (
             <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={16} /> + Add Inventory Item
+              <Plus size={16} /> Add Item
             </button>
           )}
         </div>
       </div>
 
+      {/* Filter Bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
         padding: '1rem',
@@ -147,35 +205,72 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border-color)'
       }}>
-        <div style={{ position: 'relative', width: '280px' }}>
+        <div style={{ position: 'relative', minWidth: '220px', flex: 1 }}>
           <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
             className="input-control"
-            placeholder="Search by item name or location..."
+            placeholder="Search item, location, notes..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             style={{ paddingLeft: '2.25rem', fontSize: '0.8125rem' }}
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Condition:</span>
-          <select
-            className="input-control"
+          <CustomSelect
             value={conditionFilter}
-            onChange={(e) => setConditionFilter(e.target.value)}
-            style={{ width: '150px', padding: '0.375rem 0.75rem' }}
-          >
-            <option value="All">All Conditions</option>
-            <option value="Good">Good</option>
-            <option value="Fair">Fair</option>
-            <option value="Damaged">Damaged</option>
-          </select>
+            onChange={setConditionFilter}
+            options={[
+              { label: 'All Conditions', value: 'All' },
+              { label: 'Good', value: 'Good' },
+              { label: 'Fair', value: 'Fair' },
+              { label: 'Damaged', value: 'Damaged' }
+            ]}
+            style={{ width: '160px' }}
+          />
         </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Min Qty:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Min"
+            value={minQty}
+            onChange={e => setMinQty(e.target.value)}
+            style={{ width: '80px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Max Qty:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Max"
+            value={maxQty}
+            onChange={e => setMaxQty(e.target.value)}
+            style={{ width: '80px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={resetFilters}
+            className="btn btn-ghost btn-sm"
+            style={{ color: 'var(--status-red-text)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+          >
+            <X size={14} /> Clear
+          </button>
+        )}
       </div>
 
-      {paginatedItems.length > 0 ? (
+      {/* Data Table */}
+      {loading ? (
+        <TableLoader rows={6} cols={6} />
+      ) : paginatedItems.length > 0 ? (
         <div className="table-container">
           <table className="data-table">
             <thead>
@@ -227,13 +322,22 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
       ) : (
         <EmptyState
           title="No Inventory Items Found"
-          description="No items found in guest house inventory."
+          description="No items found in guest house inventory matching filters."
           canAdd={canAdd}
           onAdd={handleOpenAdd}
           addText="Add Inventory Item"
         />
       )}
 
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredItems.length}
+        itemsPerPage={itemsPerPage}
+      />
+
+      {/* SlideOver Form Drawer */}
       <SlideOver
         isOpen={isSlideOpen}
         onClose={() => setIsSlideOpen(false)}
@@ -270,21 +374,17 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
                 onChange={(e) => setFormData({ ...formData, qty: parseInt(e.target.value) || 1 })}
               />
             </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Condition
-              </label>
-              <select
-                disabled={isViewOnly}
-                className="input-control"
-                value={formData.condition}
-                onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
-              >
-                <option value="Good">Good</option>
-                <option value="Fair">Fair</option>
-                <option value="Damaged">Damaged</option>
-              </select>
-            </div>
+            <CustomSelect
+              label="Condition"
+              value={formData.condition}
+              onChange={v => setFormData({ ...formData, condition: v })}
+              disabled={isViewOnly}
+              options={[
+                { label: 'Good', value: 'Good' },
+                { label: 'Fair', value: 'Fair' },
+                { label: 'Damaged', value: 'Damaged' }
+              ]}
+            />
           </div>
 
           <div>
@@ -304,15 +404,15 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Notes & Description
+              Notes / Description
             </label>
             <textarea
               rows={3}
               disabled={isViewOnly}
               className="input-control"
-              value={formData.notes}
+              value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="e.g. White 400-thread count sheets"
+              placeholder="e.g. Purchased in Jan 2026 for VIP Delegation suites"
             />
           </div>
 
@@ -329,12 +429,13 @@ export const GuestHouseInventory = ({ searchQuery, triggerExportModal, setToast 
         </form>
       </SlideOver>
 
+      {/* Delete Dialog */}
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}
         onConfirm={handleDelete}
         title="Delete Inventory Item"
-        message="Are you sure you want to remove this item from inventory records?"
+        message="Are you sure you want to delete this inventory item?"
       />
     </div>
   );

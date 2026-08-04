@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store, subscribeStore, addItem, updateItem, deleteItem, MODULE_STORAGE_MAP } from '../lib/store.js';
+import {
+  fetchBillPayments,
+  createBillPayment,
+  updateBillPayment,
+  deleteBillPayment
+} from '../lib/supabaseService.js';
+import { store, MODULE_STORAGE_MAP } from '../lib/store.js';
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, CreditCard } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, CreditCard, X } from 'lucide-react';
+import { Pagination } from '../components/common/Pagination.jsx';
+import { DatePicker } from '../components/common/DatePicker.jsx';
+import { TableLoader } from '../components/common/Loader.jsx';
 
 export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }) => {
   const { currentUser, hasModulePermission } = useAuth();
@@ -14,11 +23,17 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
   const canEdit = hasModulePermission('office_bills', 'edit');
   const canDelete = hasModulePermission('office_bills', 'delete');
 
-  const [items, setItems] = useState(store.getOfficeBills());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
+  // SlideOver Form State
   const [isSlideOpen, setIsSlideOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [isViewOnly, setIsViewOnly] = useState(false);
@@ -30,24 +45,44 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
     amount: 0
   });
 
+  // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
+  const loadData = async () => {
+    setLoading(true);
+    const { data, error } = await fetchBillPayments();
+    if (!error && data) {
+      setItems(data);
+    } else {
+      setItems(store.getBillPayments());
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    const unsubscribe = subscribeStore(() => {
-      setItems(store.getOfficeBills());
-    });
-    return unsubscribe;
+    loadData();
   }, []);
 
   if (!canView) return <AccessDenied moduleName="Office Bill Payments" />;
 
   const query = (searchQuery || localSearch).toLowerCase();
-  const filteredItems = items.filter(item => 
-    item.company.toLowerCase().includes(query) ||
-    item.chequeNo.toLowerCase().includes(query) ||
-    item.payee.toLowerCase().includes(query)
-  );
+  const filteredItems = items.filter(item => {
+    const matchesSearch = (item.company || '').toLowerCase().includes(query) ||
+      (item.chequeNo || '').toLowerCase().includes(query) ||
+      (item.payee || '').toLowerCase().includes(query);
 
+    const matchesDateFrom = !dateFrom || item.date >= dateFrom;
+    const matchesDateTo = !dateTo || item.date <= dateTo;
+    const matchesMinAmount = !minAmount || Number(item.amount) >= Number(minAmount);
+    const matchesMaxAmount = !maxAmount || Number(item.amount) <= Number(maxAmount);
+
+    return matchesSearch && matchesDateFrom && matchesDateTo && matchesMinAmount && matchesMaxAmount;
+  });
+
+  // Reset to page 1 on filter change
+  useEffect(() => { setCurrentPage(1); }, [query, dateFrom, dateTo, minAmount, maxAmount]);
+
+  // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -57,7 +92,7 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
     setFormData({
       date: new Date().toISOString().split('T')[0],
       company: '',
-      chequeNo: `CHK-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      chequeNo: `CHK-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
       payee: '',
       amount: 0
     });
@@ -78,37 +113,64 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
     setIsSlideOpen(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
     if (editingItem) {
-      updateItem(MODULE_STORAGE_MAP.office_bills, 'Office Bill Payments', editingItem.id, formData, currentUser, item => item.company);
-      setToast({ type: 'success', message: `Updated bill payment for ${formData.company}.` });
+      const { error } = await updateBillPayment(editingItem.id, formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Bill payment record updated.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     } else {
-      addItem(MODULE_STORAGE_MAP.office_bills, 'Office Bill Payments', formData, currentUser, item => item.company);
-      setToast({ type: 'success', message: `Recorded new cheque disbursement to ${formData.company}.` });
+      const { error } = await createBillPayment(formData, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: `Recorded payment to "${formData.company}".` });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
     }
     setIsSlideOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deletingId) {
-      deleteItem(MODULE_STORAGE_MAP.office_bills, 'Office Bill Payments', deletingId, currentUser, item => item.company);
-      setToast({ type: 'success', message: 'Bill payment record deleted.' });
+      const itemToDelete = items.find(i => i.id === deletingId);
+      const { error } = await deleteBillPayment(deletingId, itemToDelete?.company, currentUser);
+      if (!error) {
+        setToast?.({ type: 'success', message: 'Bill payment record deleted.' });
+        loadData();
+      } else {
+        setToast?.({ type: 'error', message: error.message });
+      }
       setDeletingId(null);
     }
   };
 
   const exportColumns = [
-    { label: 'Date', key: 'date' },
+    { label: 'Disbursement Date', key: 'date' },
     { label: 'Company / Utility', key: 'company' },
     { label: 'Cheque No.', key: 'chequeNo' },
-    { label: 'Payee', key: 'payee' },
+    { label: 'Payee Name', key: 'payee' },
     { label: 'Amount (GHS)', key: 'amount' }
   ];
+
+  const resetFilters = () => {
+    setDateFrom('');
+    setDateTo('');
+    setMinAmount('');
+    setMaxAmount('');
+    setLocalSearch('');
+  };
+
+  const hasActiveFilters = dateFrom || dateTo || minAmount || maxAmount || localSearch;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
@@ -119,22 +181,25 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={() => triggerExportModal('Office Bill Payments', filteredItems, exportColumns)} style={{ color: '#10B981', borderColor: '#10B981' }}>
-            <FileSpreadsheet size={16} /> Export to Google Sheets
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => triggerExportModal?.('Office Bill Payments', filteredItems, exportColumns)}
+          >
+            <FileSpreadsheet size={16} /> Export
           </button>
           {canAdd && (
             <button className="btn btn-primary" onClick={handleOpenAdd}>
-              <Plus size={16} /> + Record Bill Payment
+              <Plus size={16} /> Record Payment
             </button>
           )}
         </div>
       </div>
 
+      {/* Filter Bar with Date Filters & Amount Filters */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: '1rem',
         padding: '1rem',
@@ -142,20 +207,80 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border-color)'
       }}>
-        <div style={{ position: 'relative', width: '320px' }}>
+        {/* Search */}
+        <div style={{ position: 'relative', minWidth: '220px', flex: 1 }}>
           <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
             className="input-control"
-            placeholder="Search by company, cheque no. or payee..."
+            placeholder="Search company, cheque no, or payee..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
             style={{ paddingLeft: '2.25rem', fontSize: '0.8125rem' }}
           />
         </div>
+
+        {/* Date Range Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>From:</span>
+          <DatePicker
+            value={dateFrom}
+            onChange={setDateFrom}
+            placeholder="Date from"
+            style={{ width: '140px' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>To:</span>
+          <DatePicker
+            value={dateTo}
+            onChange={setDateTo}
+            placeholder="Date to"
+            style={{ width: '140px' }}
+          />
+        </div>
+
+        {/* Amount Range Filters */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Min GHS:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Min"
+            value={minAmount}
+            onChange={e => setMinAmount(e.target.value)}
+            style={{ width: '90px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Max GHS:</span>
+          <input
+            type="number"
+            className="input-control"
+            placeholder="Max"
+            value={maxAmount}
+            onChange={e => setMaxAmount(e.target.value)}
+            style={{ width: '90px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
+          />
+        </div>
+
+        {hasActiveFilters && (
+          <button
+            onClick={resetFilters}
+            className="btn btn-ghost btn-sm"
+            style={{ color: 'var(--status-red-text)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
+          >
+            <X size={14} /> Clear
+          </button>
+        )}
       </div>
 
-      {paginatedItems.length > 0 ? (
+      {/* Data Table */}
+      {loading ? (
+        <TableLoader rows={6} cols={6} />
+      ) : paginatedItems.length > 0 ? (
         <div className="table-container">
           <table className="data-table">
             <thead>
@@ -209,32 +334,34 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
       ) : (
         <EmptyState
           title="No Bill Payments Found"
-          description="No cheque or payment records found."
+          description="No cheque or payment records found matching filters."
           canAdd={canAdd}
           onAdd={handleOpenAdd}
           addText="Record Bill Payment"
         />
       )}
 
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredItems.length}
+        itemsPerPage={itemsPerPage}
+      />
+
+      {/* SlideOver Form Drawer */}
       <SlideOver
         isOpen={isSlideOpen}
         onClose={() => setIsSlideOpen(false)}
         title={isViewOnly ? 'Bill Payment Details' : editingItem ? 'Edit Bill Payment' : 'Record Office Bill Payment'}
       >
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Payment Date
-            </label>
-            <input
-              type="date"
-              required
-              disabled={isViewOnly}
-              className="input-control"
-              value={formData.date}
-              onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-            />
-          </div>
+          <DatePicker
+            label="Payment Date"
+            value={formData.date}
+            onChange={v => setFormData({ ...formData, date: v })}
+            disabled={isViewOnly}
+          />
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
@@ -263,6 +390,7 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
                 className="input-control"
                 value={formData.chequeNo}
                 onChange={(e) => setFormData({ ...formData, chequeNo: e.target.value })}
+                placeholder="e.g. CHK-2026-0891"
               />
             </div>
             <div>
@@ -283,7 +411,7 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
 
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Payee Name
+              Payee Name / Regional Office
             </label>
             <input
               type="text"
@@ -302,13 +430,14 @@ export const OfficeBillPayments = ({ searchQuery, triggerExportModal, setToast }
             </button>
             {!isViewOnly && (
               <button type="submit" className="btn btn-primary">
-                Save Disbursement
+                Save Payment Record
               </button>
             )}
           </div>
         </form>
       </SlideOver>
 
+      {/* Delete Dialog */}
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}

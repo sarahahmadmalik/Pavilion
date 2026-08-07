@@ -6,7 +6,7 @@ import {
   updateOfficeMaintenance,
   deleteOfficeMaintenance
 } from '../lib/supabaseService.js';
-import { store, MODULE_STORAGE_MAP } from '../lib/store.js';
+
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';

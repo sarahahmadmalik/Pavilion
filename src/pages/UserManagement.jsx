@@ -7,7 +7,7 @@ import {
   deleteUser,
   upsertUserPermissions
 } from '../lib/supabaseService.js';
-import { store } from '../lib/store.js';
+
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';

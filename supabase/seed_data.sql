@@ -182,13 +182,13 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 INSERT INTO auth.users (
     id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, recovery_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
 ) VALUES 
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@mtaghana.org', crypt('SuperAdmin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Tariq Malik"}', false, NOW(), NOW()),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@mtaghana.org', crypt('SuperAdmin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Sara Ahmad Malik"}', false, NOW(), NOW()),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@mtaghana.org', crypt('Admin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Usman Khan"}', false, NOW(), NOW()),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'staff@mtaghana.org', crypt('Staff123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Hamza Ahmed"}', false, NOW(), NOW())
 ON CONFLICT (id) DO UPDATE SET encrypted_password = EXCLUDED.encrypted_password, raw_user_meta_data = EXCLUDED.raw_user_meta_data;
 
 INSERT INTO public.users (id, name, email, role, status, avatar) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Tariq Malik', 'superadmin@mtaghana.org', 'super_admin', 'Active', NULL),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Sara Ahmad Malik', 'superadmin@mtaghana.org', 'super_admin', 'Active', NULL),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', 'admin@mtaghana.org', 'admin', 'Active', NULL),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', 'staff@mtaghana.org', 'staff', 'Active', NULL)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status;
@@ -263,5 +263,5 @@ INSERT INTO public.office_maintenance (reported_on, issue, status, updates, loca
 
 -- Activity Logs
 INSERT INTO public.activity_logs (timestamp, user_id, user_name, user_avatar, action, module_name, record_affected, details) VALUES
-(NOW() - INTERVAL '15 minutes', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Tariq Malik', NULL, 'Created', 'Guest List', 'Bilal Chaudhry', '{"checkIn": "2026-08-01", "country": "Pakistan"}'),
-(NOW() - INTERVAL '45 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}');
+(NOW() - INTERVAL '15 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', NULL, 'Created', 'Guest List', 'Bilal Chaudhry', '{"checkIn": "2026-08-01", "country": "Pakistan"}'),
+(NOW() - INTERVAL '45 minutes', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}');

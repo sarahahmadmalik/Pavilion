@@ -12,6 +12,9 @@ import { sanitizeInput, sanitizeFormData } from './securityUtils.js';
 // ─── Helper: log an activity ─────────────────────────────────────────────────
 async function logActivity(currentUser, action, moduleName, recordAffected, details = null) {
   if (!currentUser) return;
+  // Do not create activity logs for Super Admin actions
+  if (currentUser.role === 'super_admin') return;
+
   await supabase.from('activity_logs').insert({
     user_id: currentUser.id,
     user_name: sanitizeInput(currentUser.name),

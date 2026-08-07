@@ -18,8 +18,14 @@ import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { DatePicker } from '../components/common/DatePicker.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 
-export const OfficeMaintenance = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
+export const OfficeMaintenance = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const triggerImportModal = props.triggerImportModal || layoutContext.triggerImportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('office_maintenance', 'view');
   const canAdd = hasModulePermission('office_maintenance', 'add');

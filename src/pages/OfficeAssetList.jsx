@@ -18,8 +18,14 @@ import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 
-export const OfficeAssetList = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
+export const OfficeAssetList = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const triggerImportModal = props.triggerImportModal || layoutContext.triggerImportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('office_assets', 'view');
   const canAdd = hasModulePermission('office_assets', 'add');

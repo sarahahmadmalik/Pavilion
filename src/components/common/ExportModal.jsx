@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal } from './Modal.jsx';
-import { FileSpreadsheet, Download, Check } from 'lucide-react';
+import { FileSpreadsheet, Download } from 'lucide-react';
 
-export const ExportModal = ({ isOpen, onClose, onConfirm, moduleTitle = 'Records' }) => {
+export const ExportModal = ({ isOpen, onClose, onConfirm, moduleTitle = 'Records', hasActiveFilters = false }) => {
   const [scope, setScope] = useState('all'); // 'all' | 'filtered'
 
+  useEffect(() => {
+    if (hasActiveFilters) {
+      setScope('filtered');
+    } else {
+      setScope('all');
+    }
+  }, [hasActiveFilters, isOpen]);
+
   const handleConfirm = () => {
-    onConfirm({ scope, method: 'excel' });
+    onConfirm({ scope: hasActiveFilters ? scope : 'all', method: 'excel' });
     onClose();
   };
 
@@ -68,28 +76,30 @@ export const ExportModal = ({ isOpen, onClose, onConfirm, moduleTitle = 'Records
               </div>
             </label>
 
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1rem',
-              border: `2px solid ${scope === 'filtered' ? '#10B981' : 'var(--border-color)'}`,
-              borderRadius: 'var(--radius-md)', cursor: 'pointer',
-              backgroundColor: scope === 'filtered' ? 'rgba(16,185,129,0.08)' : 'var(--bg-input)',
-              transition: 'all 0.15s ease'
-            }}>
-              <input
-                type="radio" name="scope"
-                checked={scope === 'filtered'}
-                onChange={() => setScope('filtered')}
-                style={{ accentColor: '#10B981' }}
-              />
-              <div>
-                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)', display: 'block' }}>
-                  Filtered View Only
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  Export only the current search &amp; filter results.
-                </span>
-              </div>
-            </label>
+            {hasActiveFilters && (
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.875rem 1rem',
+                border: `2px solid ${scope === 'filtered' ? '#10B981' : 'var(--border-color)'}`,
+                borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                backgroundColor: scope === 'filtered' ? 'rgba(16,185,129,0.08)' : 'var(--bg-input)',
+                transition: 'all 0.15s ease'
+              }}>
+                <input
+                  type="radio" name="scope"
+                  checked={scope === 'filtered'}
+                  onChange={() => setScope('filtered')}
+                  style={{ accentColor: '#10B981' }}
+                />
+                <div>
+                  <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)', display: 'block' }}>
+                    Filtered View Only
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Export only the current search &amp; filter results.
+                  </span>
+                </div>
+              </label>
+            )}
           </div>
         </div>
 

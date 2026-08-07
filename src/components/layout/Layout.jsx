@@ -8,8 +8,19 @@ import { ExportModal } from '../common/ExportModal.jsx';
 import { ImportModal } from '../common/ImportModal.jsx';
 import { PageTransition } from '../common/PageTransition.jsx';
 import { exportToExcel } from '../../lib/exportUtils.js';
-import { batchInsert } from '../../lib/importUtils.js';
+import { batchInsert, generateSampleTemplate, IMPORT_CONFIGS } from '../../lib/importUtils.js';
 import { supabase } from '../../lib/supabase.js';
+
+// Layout Context for reliable child component access to modal triggers
+export const LayoutContext = React.createContext({
+  triggerExportModal: () => {},
+  triggerImportModal: () => {},
+  searchQuery: '',
+  setSearchQuery: () => {},
+  setToast: () => {}
+});
+
+export const useLayout = () => React.useContext(LayoutContext);
 import {
   Bell, Activity, Users, Wrench, Package, CreditCard, Barcode, ClipboardList, ShieldCheck,
   CheckCheck, Clock
@@ -143,7 +154,10 @@ export const Layout = ({ activePage, setActivePage, children }) => {
   });
 
   const triggerExportModal = (moduleTitle, filteredData, columns, allData = null) => {
-    setExportState({ isOpen: true, moduleTitle, data: allData || filteredData, columns, filteredData });
+    const fullData = allData || filteredData || [];
+    const filtData = filteredData || [];
+    const hasActiveFilters = Array.isArray(filtData) && Array.isArray(fullData) && filtData.length > 0 && filtData.length < fullData.length;
+    setExportState({ isOpen: true, moduleTitle, data: fullData, columns, filteredData: filtData, hasActiveFilters });
   };
 
   const handleConfirmExport = ({ scope }) => {
@@ -347,7 +361,8 @@ export const Layout = ({ activePage, setActivePage, children }) => {
   const isUnread = (notif, idx) => idx < unreadCount && !readIds.has(notif.id);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-page)' }}>
+    <LayoutContext.Provider value={{ triggerExportModal, triggerImportModal, searchQuery, setSearchQuery, setToast }}>
+      <div style={{ display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', backgroundColor: 'var(--bg-page)' }}>
       {/* Sidebar Navigation */}
       <Sidebar
         activePage={activePage}
@@ -469,6 +484,7 @@ export const Layout = ({ activePage, setActivePage, children }) => {
         onClose={() => setExportState(prev => ({ ...prev, isOpen: false }))}
         onConfirm={handleConfirmExport}
         moduleTitle={exportState.moduleTitle}
+        hasActiveFilters={exportState.hasActiveFilters}
       />
 
       {/* ─── Import Modal ───────────────────────────────────────────────────── */}
@@ -482,5 +498,6 @@ export const Layout = ({ activePage, setActivePage, children }) => {
       {/* ─── Toast Snackbar ─────────────────────────────────────────────────── */}
       <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
+    </LayoutContext.Provider>
   );
 };

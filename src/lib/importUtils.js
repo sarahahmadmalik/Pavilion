@@ -89,26 +89,47 @@ export const IMPORT_CONFIGS = {
   }
 };
 
+const SAMPLE_DATA = {
+  guest_list: [
+    { 'Name': 'Kofi Mensah', 'Check In Date (YYYY-MM-DD)': '2026-08-10', 'Check Out Date (YYYY-MM-DD)': '2026-08-15', 'Country': 'Ghana', 'Room Allocated': 'VIP Suite 101', 'Purpose of Stay': 'Official Delegation' },
+    { 'Name': 'Sarah Jenkins', 'Check In Date (YYYY-MM-DD)': '2026-08-12', 'Check Out Date (YYYY-MM-DD)': '2026-08-18', 'Country': 'United Kingdom', 'Room Allocated': 'Room 204', 'Purpose of Stay': 'Operational Audit Review' }
+  ],
+  gh_maintenance: [
+    { 'Reported On (YYYY-MM-DD)': '2026-08-01', 'Issue Description': 'AC Unit Leaking Water in Room 102', 'Status (Open/In Progress/Resolved)': 'Open', 'Location': 'Guest House Block A', 'Worker Name': 'Kwame Maintenance', 'Cost (GHS)': 250, 'Updates / Notes': 'Parts ordered' }
+  ],
+  gh_inventory: [
+    { 'Item Description': 'Egyptian Cotton Bed Sheets', 'Quantity': 12, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'Main Linen Store', 'Notes': 'Newly delivered stock' },
+    { 'Item Description': 'Smart LED TV 43-inch', 'Quantity': 4, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'VIP Suites', 'Notes': 'Wall mounted' }
+  ],
+  office_bills: [
+    { 'Date (YYYY-MM-DD)': '2026-08-05', 'Company / Utility': 'Ghana Water Company', 'Cheque No.': 'CHK-2026-8812', 'Payee': 'GWC Operations Ltd', 'Amount (GHS)': 450 }
+  ],
+  office_assets: [
+    { 'Barcode / Asset Tag': 'MTA-AST-90214', 'Description': 'Dell UltraSharp 27-inch Monitor', 'Status (Active/Under Repair/Retired)': 'Active', 'Location': 'IT Office', 'Assigned To': 'Kofi Mensah' }
+  ],
+  office_maintenance: [
+    { 'Reported On (YYYY-MM-DD)': '2026-08-03', 'Issue Description': 'Elevator Door Sensor Malfunction', 'Status (Open/In Progress/Resolved)': 'In Progress', 'Location': 'Main Entrance Lobby', 'Worker Name': 'Otis Elevator Service', 'Cost (GHS)': 1200, 'Updates / Notes': 'Sensor replaced' }
+  ]
+};
+
 // ─── Generate & download sample template ─────────────────────────────────────
 export function downloadSampleTemplate(moduleKey) {
   const config = IMPORT_CONFIGS[moduleKey];
   if (!config) return;
 
-  const headers = config.columns.map(c => c.header);
-  const ws = XLSX.utils.aoa_to_sheet([headers]);
-  ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length + 4, 18) }));
-
-  // Style note in A2
-  const noteRow = ['← Fill your data below this row. Do not modify the column headers above.'];
-  XLSX.utils.sheet_add_aoa(ws, [noteRow], { origin: 'A2' });
+  const sampleRows = SAMPLE_DATA[moduleKey] || [];
+  const ws = XLSX.utils.json_to_sheet(sampleRows, { header: config.columns.map(c => c.header) });
+  ws['!cols'] = config.columns.map(c => ({ wch: Math.max(c.header.length + 4, 18) }));
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, config.label.slice(0, 31));
 
-  const filename = `MTA_Ghana_${config.label.replace(/\s+/g, '_')}_Import_Template.xlsx`;
+  const filename = `MTA_Ghana_${config.label.replace(/\s+/g, '_')}_Sample_Import_Template.xlsx`;
   XLSX.writeFile(wb, filename);
   return filename;
 }
+
+export const generateSampleTemplate = downloadSampleTemplate;
 
 // ─── Parse uploaded Excel file ────────────────────────────────────────────────
 export function parseExcelFile(file) {

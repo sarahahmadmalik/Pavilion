@@ -16,8 +16,14 @@ import { Pagination } from '../components/common/Pagination.jsx';
 import { DatePicker } from '../components/common/DatePicker.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 
-export const OfficeBillPayments = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
+export const OfficeBillPayments = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const triggerImportModal = props.triggerImportModal || layoutContext.triggerImportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('office_bills', 'view');
   const canAdd = hasModulePermission('office_bills', 'add');

@@ -17,8 +17,14 @@ import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 
-export const GuestHouseInventory = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
+export const GuestHouseInventory = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const triggerImportModal = props.triggerImportModal || layoutContext.triggerImportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('gh_inventory', 'view');
   const canAdd = hasModulePermission('gh_inventory', 'add');

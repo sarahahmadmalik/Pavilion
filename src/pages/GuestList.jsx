@@ -18,9 +18,15 @@ import { SearchableSelect } from '../components/common/SearchableSelect.jsx';
 import { DatePicker } from '../components/common/DatePicker.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 import { ALL_COUNTRIES } from '../lib/countries.js';
 
-export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
+export const GuestList = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const triggerImportModal = props.triggerImportModal || layoutContext.triggerImportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('guest_list', 'view');
   const canAdd = hasModulePermission('guest_list', 'add');
@@ -92,9 +98,18 @@ export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal,
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const [touched, setTouched] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleBlur = (field) => {
+    setTouched(prev => ({ ...prev, [field]: true }));
+  };
+
   const handleOpenAdd = () => {
     setEditingItem(null);
     setIsViewOnly(false);
+    setTouched({});
+    setSubmitted(false);
     setFormData({
       name: '',
       checkIn: new Date().toISOString().split('T')[0],
@@ -109,6 +124,8 @@ export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal,
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setIsViewOnly(false);
+    setTouched({});
+    setSubmitted(false);
     setFormData({ ...item });
     setIsSlideOpen(true);
   };
@@ -116,12 +133,21 @@ export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal,
   const handleOpenView = (item) => {
     setEditingItem(item);
     setIsViewOnly(true);
+    setTouched({});
+    setSubmitted(false);
     setFormData({ ...item });
     setIsSlideOpen(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
+    setSubmitted(true);
+
+    if (!formData.name.trim() || !formData.country || !formData.roomAllocated.trim()) {
+      setToast?.({ type: 'error', message: 'Please fill in all required fields marked in red.' });
+      return;
+    }
+
     if (editingItem) {
       const { data, error } = await updateGuest(editingItem.id, formData, currentUser);
       if (!error) {
@@ -355,22 +381,26 @@ export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal,
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-              Full Name
+              Full Name *
             </label>
             <input
               type="text"
               required
               disabled={isViewOnly}
-              className="input-control"
+              className={`input-control ${(touched.name || submitted) && !formData.name.trim() ? 'input-invalid' : ''}`}
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onBlur={() => handleBlur('name')}
               placeholder="e.g. Maulana Abdul Rashid"
             />
+            {(touched.name || submitted) && !formData.name.trim() && (
+              <span className="input-error-msg">Full Name is required.</span>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <DatePicker
-              label="Check In Date"
+              label="Check In Date *"
               value={formData.checkIn}
               onChange={v => setFormData({ ...formData, checkIn: v })}
               disabled={isViewOnly}
@@ -384,29 +414,38 @@ export const GuestList = ({ searchQuery, triggerExportModal, triggerImportModal,
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <SearchableSelect
-              label="Country of Origin"
-              value={formData.country}
-              onChange={v => setFormData({ ...formData, country: v })}
-              options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
-              disabled={isViewOnly}
-              placeholder="Select Country"
-              searchPlaceholder="Search country..."
-            />
+            <div>
+              <SearchableSelect
+                label="Country of Origin *"
+                value={formData.country}
+                onChange={v => setFormData({ ...formData, country: v })}
+                options={ALL_COUNTRIES.map(c => ({ label: c, value: c }))}
+                disabled={isViewOnly}
+                placeholder="Select Country"
+                searchPlaceholder="Search country..."
+              />
+              {(touched.country || submitted) && !formData.country && (
+                <span className="input-error-msg">Country is required.</span>
+              )}
+            </div>
 
             <div>
               <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
-                Room Allocated
+                Room Allocated *
               </label>
               <input
                 type="text"
                 required
                 disabled={isViewOnly}
-                className="input-control"
+                className={`input-control ${(touched.roomAllocated || submitted) && !formData.roomAllocated.trim() ? 'input-invalid' : ''}`}
                 value={formData.roomAllocated}
                 onChange={(e) => setFormData({ ...formData, roomAllocated: e.target.value })}
+                onBlur={() => handleBlur('roomAllocated')}
                 placeholder="e.g. VIP Suite 101"
               />
+              {(touched.roomAllocated || submitted) && !formData.roomAllocated.trim() && (
+                <span className="input-error-msg">Room Allocated is required.</span>
+              )}
             </div>
           </div>
 

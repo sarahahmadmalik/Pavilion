@@ -153,7 +153,7 @@ export const Dashboard = ({ setActivePage }) => {
     if (role === 'super_admin' || role === 'admin') return true;
     const key = (log.moduleName || '').toLowerCase().replace(/\s+/g, '_');
     return hasModulePermission(key);
-  }).slice(0, 6);
+  }).slice(0, 2);
 
   // ─── KPI card configs ─────────────────────────────────────────────────────
   const statCards = [

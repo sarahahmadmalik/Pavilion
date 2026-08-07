@@ -264,5 +264,4 @@ INSERT INTO public.office_maintenance (reported_on, issue, status, updates, loca
 -- Activity Logs
 INSERT INTO public.activity_logs (timestamp, user_id, user_name, user_avatar, action, module_name, record_affected, details) VALUES
 (NOW() - INTERVAL '15 minutes', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Tariq Malik', NULL, 'Created', 'Guest List', 'Bilal Chaudhry', '{"checkIn": "2026-08-01", "country": "Pakistan"}'),
-(NOW() - INTERVAL '45 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}'),
-(NOW() - INTERVAL '2 hours', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', NULL, 'Created', 'Office Bill Payments', 'Electricity Company of Ghana (ECG)', '{"amount": 3450.00, "chequeNo": "CHK-2026-0891"}');
+(NOW() - INTERVAL '45 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}');

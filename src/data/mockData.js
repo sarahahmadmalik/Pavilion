@@ -310,17 +310,6 @@ export const INITIAL_LOGS = [
     moduleName: 'Guest House Maintenance',
     recordAffected: 'Air Conditioner leaking water in Room 204',
     details: { status: 'In Progress' }
-  },
-  {
-    id: 'log-703',
-    timestamp: '2026-08-04 11:20',
-    userId: 'usr-3',
-    userName: 'Hamza Ahmed',
-    userAvatar: null,
-    action: 'Created',
-    moduleName: 'Office Bill Payments',
-    recordAffected: 'Electricity Company of Ghana (ECG)',
-    details: { amount: 3450.00 }
   }
 ];
 

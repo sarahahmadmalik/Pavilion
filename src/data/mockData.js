@@ -3,7 +3,7 @@
 export const INITIAL_USERS = [
   {
     id: 'usr-1',
-    name: 'Alhaj Mubarak Ahmad',
+    name: 'Tariq Malik',
     email: 'superadmin@mtaghana.org',
     role: 'super_admin',
     status: 'Active',
@@ -20,7 +20,7 @@ export const INITIAL_USERS = [
   },
   {
     id: 'usr-2',
-    name: 'Dr. Ibrahim Mensah',
+    name: 'Usman Khan',
     email: 'admin@mtaghana.org',
     role: 'admin',
     status: 'Active',
@@ -37,7 +37,7 @@ export const INITIAL_USERS = [
   },
   {
     id: 'usr-3',
-    name: 'Kwame Owusu',
+    name: 'Hamza Ahmed',
     email: 'staff@mtaghana.org',
     role: 'staff',
     status: 'Active',
@@ -54,11 +54,11 @@ export const INITIAL_USERS = [
   },
   {
     id: 'usr-4',
-    name: 'Ama Serwaa',
-    email: 'aserwaa@mtaghana.org',
+    name: 'Saad Malik',
+    email: 'saad@mtaghana.org',
     role: 'staff',
     status: 'Active',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150',
+    avatar: null,
     lastLogin: '2026-08-02 16:20',
     permissions: {
       guest_list: { view: false, add: false, edit: false, delete: false },
@@ -71,11 +71,11 @@ export const INITIAL_USERS = [
   },
   {
     id: 'usr-5',
-    name: 'Kofi Annan',
-    email: 'kofi@mtaghana.org',
+    name: 'Rehan Shah',
+    email: 'rehan@mtaghana.org',
     role: 'staff',
     status: 'Inactive',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
+    avatar: null,
     lastLogin: '2026-06-12 10:00',
     permissions: {
       guest_list: { view: true, add: false, edit: false, delete: false },
@@ -91,16 +91,16 @@ export const INITIAL_USERS = [
 export const INITIAL_GUESTS = [
   {
     id: 'gst-101',
-    name: 'Maulana Abdul Rashid',
+    name: 'Bilal Chaudhry',
     checkIn: '2026-08-01',
     checkOut: '2026-08-10',
-    country: 'United Kingdom',
+    country: 'Pakistan',
     roomAllocated: 'VIP Suite 101',
     purposeOfStay: 'Annual Conference & Inspection Tour'
   },
   {
     id: 'gst-102',
-    name: 'Tariq Mahmood',
+    name: 'Zeeshan Ali',
     checkIn: '2026-08-03',
     checkOut: '2026-08-07',
     country: 'Pakistan',
@@ -109,30 +109,30 @@ export const INITIAL_GUESTS = [
   },
   {
     id: 'gst-103',
-    name: 'Hajia Fatimah Baidoo',
+    name: 'Farhan Akhtar',
     checkIn: '2026-08-04',
     checkOut: '2026-08-08',
-    country: 'Ghana (Kumasi)',
+    country: 'Pakistan',
     roomAllocated: 'Room 105',
-    purposeOfStay: 'Regional Women Auxiliary Executive Meeting'
+    purposeOfStay: 'Regional Auxiliary Executive Meeting'
   },
   {
     id: 'gst-104',
-    name: 'Brother Usman Siddique',
+    name: 'Zubair Hassan',
     checkIn: '2026-07-28',
     checkOut: '2026-08-05',
-    country: 'Nigeria',
+    country: 'Pakistan',
     roomAllocated: 'Room 202',
     purposeOfStay: 'Broadcast Studio Maintenance Workshop'
   },
   {
     id: 'gst-105',
-    name: 'Sister Maryam Mensah',
+    name: 'Faisal Saeed',
     checkIn: '2026-08-02',
     checkOut: '2026-08-12',
-    country: 'Canada',
+    country: 'Pakistan',
     roomAllocated: 'VIP Suite 102',
-    purposeOfStay: 'Humanitarian Relief Logistics Coordination'
+    purposeOfStay: 'Relief Logistics Coordination'
   }
 ];
 
@@ -144,7 +144,7 @@ export const INITIAL_GH_MAINTENANCE = [
     status: 'In Progress',
     updates: 'Technician inspected. Replacing compressor drain pipe.',
     location: 'Guest House Block B - Room 204',
-    nameOfWorker: 'Kwabena HVAC Services',
+    nameOfWorker: 'Kamran HVAC Services',
     cost: 450.00
   },
   {
@@ -152,7 +152,7 @@ export const INITIAL_GH_MAINTENANCE = [
     reportedOn: '2026-08-03',
     issue: 'Water heater malfunction in VIP Suite 101',
     status: 'Open',
-    updates: 'Reported by guest housekeeper. Electrician requested.',
+    updates: 'Reported by housekeeper. Electrician requested.',
     location: 'Guest House Main Wing - Suite 101',
     nameOfWorker: 'Pending Assignment',
     cost: 0.00
@@ -164,7 +164,7 @@ export const INITIAL_GH_MAINTENANCE = [
     status: 'Resolved',
     updates: 'New brass lock set installed and tested successfully.',
     location: 'Guest House Block A - Room 102',
-    nameOfWorker: 'Osei Carpentry Works',
+    nameOfWorker: 'Adnan Carpentry Works',
     cost: 180.00
   },
   {
@@ -198,27 +198,19 @@ export const INITIAL_GH_INVENTORY = [
   },
   {
     id: 'ghi-303',
-    item: 'Standing Oscillating Fans',
-    qty: 6,
+    item: 'Daikin 2.0 HP Inverter AC Units',
+    qty: 18,
     condition: 'Fair',
-    location: 'Store Room 2',
-    notes: '2 units exhibit slight motor noise when operating at level 3.'
+    location: 'Guest Rooms Block A & B',
+    notes: 'Serviced quarterly.'
   },
   {
     id: 'ghi-304',
-    item: 'Smart LED TV 43-inch',
-    qty: 4,
-    condition: 'Good',
-    location: 'VIP Suites & Lounge',
-    notes: 'Wall mounted with HDMI inputs for MTA Studios link.'
-  },
-  {
-    id: 'ghi-305',
-    item: 'Electric Water Kettles 1.8L',
+    item: 'Phillips HD LED Televisions (55 inch)',
     qty: 8,
-    condition: 'Damaged',
-    location: 'Store Room 1',
-    notes: '2 units have blown heating coils; scheduled for retirement.'
+    condition: 'Good',
+    location: 'VIP Suites & Main Lounge',
+    notes: 'Connected to MTA Satellite Dish.'
   }
 ];
 
@@ -236,153 +228,100 @@ export const INITIAL_OFFICE_BILLS = [
     date: '2026-08-02',
     company: 'Ghana Water Company Limited',
     chequeNo: 'CHK-2026-0892',
-    payee: 'GWCL Metered Services',
-    amount: 1280.50
+    payee: 'GWCL Metered Service Division',
+    amount: 1280.00
   },
   {
     id: 'bil-403',
-    date: '2026-07-28',
+    date: '2026-07-31',
     company: 'MTN Ghana Fibre Broadband',
-    chequeNo: 'CHK-2026-0885',
-    payee: 'MTN Enterprise Business',
-    amount: 2100.00
-  },
-  {
-    id: 'bil-404',
-    date: '2026-07-20',
-    company: 'State Insurance Corporation (SIC)',
-    chequeNo: 'CHK-2026-0870',
-    payee: 'SIC Fire & Property Insurance',
-    amount: 6500.00
+    chequeNo: 'CHK-2026-0893',
+    payee: 'MTN Enterprise Business Unit',
+    amount: 2150.00
   }
 ];
 
 export const INITIAL_OFFICE_ASSETS = [
   {
     id: 'ast-501',
-    barcode: 'MTA-GH-AST-0012',
-    description: 'Dell Latitude 5540 i7 16GB Laptop',
+    barcode: 'MTA-AST-90214',
+    description: 'Dell Latitude 5540 i7 16GB RAM Studio Laptop',
     status: 'In Use',
-    location: 'Executive Director Office'
+    location: 'Master Control Room'
   },
   {
     id: 'ast-502',
-    barcode: 'MTA-GH-AST-0045',
-    description: 'HP LaserJet Enterprise Color Printer M553',
+    barcode: 'MTA-AST-90215',
+    description: 'Sony HXR-NX80 4K Ultra HD Broadcast Camera',
     status: 'In Use',
-    location: 'Administration Central Printing Hub'
+    location: 'Studio A - Main Set'
   },
   {
     id: 'ast-503',
-    barcode: 'MTA-GH-AST-0089',
-    description: 'Epson Pro Cinema 4K Projector',
-    status: 'In Storage',
-    location: 'Conference Room Store'
-  },
-  {
-    id: 'ast-504',
-    barcode: 'MTA-GH-AST-0104',
-    description: 'APC Smart-UPS 3000VA Battery Backup',
+    barcode: 'MTA-AST-90216',
+    description: 'HP Color LaserJet Enterprise Printer X57745',
     status: 'In Use',
-    location: 'Server Room'
-  },
-  {
-    id: 'ast-505',
-    barcode: 'MTA-GH-AST-0003',
-    description: 'Canon ImageRUNNER Copier 2520',
-    status: 'Retired',
-    location: 'Basement Storage'
+    location: 'Administration Office'
   }
 ];
 
 export const INITIAL_OFFICE_MAINTENANCE = [
   {
     id: 'ofm-601',
-    reportedOn: '2026-08-03',
-    issue: 'Perkins 150kVA Standby Generator monthly service',
+    reportedOn: '2026-08-01',
+    issue: 'Perkins 150kVA Standby Generator monthly servicing',
     status: 'In Progress',
-    updates: 'Replacing fuel filters and engine oil change.',
-    location: 'Main Compound Generator Station',
+    updates: 'Engine oil drained, new filters installed.',
+    location: 'Generator House',
     nameOfWorker: 'Mantrac Ghana Engineers',
     cost: 1850.00
   },
   {
     id: 'ofm-602',
-    reportedOn: '2026-08-01',
-    issue: 'Conference Room ceiling speaker audio static',
-    status: 'Open',
-    updates: 'Awaiting audio engineer diagnosis.',
-    location: 'Main Administration Conference Hall',
-    nameOfWorker: 'MTA Broadcast Team',
-    cost: 0.00
-  },
-  {
-    id: 'ofm-603',
-    reportedOn: '2026-07-26',
-    issue: 'Server Room dedicated AC unit thermostat recalibration',
+    reportedOn: '2026-07-30',
+    issue: 'Studio B Acoustic Panel wall mounting & repair',
     status: 'Resolved',
-    updates: 'Calibrated digital sensor. Temperature holding steady at 18°C.',
-    location: 'IT Server Room 104',
-    nameOfWorker: 'CoolAir Ghana Ltd',
-    cost: 550.00
+    updates: 'Re-anchored 6 soundproof panels.',
+    location: 'Studio B',
+    nameOfWorker: 'Samuel Addo (Acoustic Spec)',
+    cost: 650.00
   }
 ];
 
-export const INITIAL_ACTIVITY_LOGS = [
+export const INITIAL_LOGS = [
   {
-    id: 'log-901',
-    timestamp: '2026-08-04 14:30',
+    id: 'log-701',
+    timestamp: '2026-08-04 14:15',
     userId: 'usr-1',
-    userName: 'Alhaj Mubarak Ahmad',
-    userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+    userName: 'Tariq Malik',
+    userAvatar: null,
     action: 'Created',
     moduleName: 'Guest List',
-    recordAffected: 'Guest: Maulana Abdul Rashid',
-    details: {
-      name: { old: null, new: 'Maulana Abdul Rashid' },
-      country: { old: null, new: 'United Kingdom' },
-      roomAllocated: { old: null, new: 'VIP Suite 101' }
-    }
+    recordAffected: 'Bilal Chaudhry',
+    details: { checkIn: '2026-08-01', country: 'Pakistan' }
   },
   {
-    id: 'log-902',
-    timestamp: '2026-08-04 11:12',
+    id: 'log-702',
+    timestamp: '2026-08-04 13:40',
     userId: 'usr-2',
-    userName: 'Dr. Ibrahim Mensah',
-    userAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150',
+    userName: 'Usman Khan',
+    userAvatar: null,
     action: 'Edited',
     moduleName: 'Guest House Maintenance',
-    recordAffected: 'Issue: AC leaking in Room 204',
-    details: {
-      status: { old: 'Open', new: 'In Progress' },
-      updates: { old: 'Reported by housekeeping', new: 'Technician inspected. Replacing compressor drain pipe.' }
-    }
+    recordAffected: 'Air Conditioner leaking water in Room 204',
+    details: { status: 'In Progress' }
   },
   {
-    id: 'log-903',
-    timestamp: '2026-08-03 16:45',
+    id: 'log-703',
+    timestamp: '2026-08-04 11:20',
     userId: 'usr-3',
-    userName: 'Kwame Owusu',
-    userAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
+    userName: 'Hamza Ahmed',
+    userAvatar: null,
     action: 'Created',
-    moduleName: 'Guest House Inventory',
-    recordAffected: 'Item: Egyptian Cotton Bedding Sets',
-    details: {
-      qty: { old: null, new: 24 },
-      condition: { old: null, new: 'Good' }
-    }
-  },
-  {
-    id: 'log-904',
-    timestamp: '2026-08-02 10:20',
-    userId: 'usr-1',
-    userName: 'Alhaj Mubarak Ahmad',
-    userAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    action: 'Edited',
-    moduleName: 'User Management',
-    recordAffected: 'User: Kwame Owusu',
-    details: {
-      permissions: { old: 'Read Only', new: 'Custom Staff Access (Guest List + Inventory)' }
-    }
+    moduleName: 'Office Bill Payments',
+    recordAffected: 'Electricity Company of Ghana (ECG)',
+    details: { amount: 3450.00 }
   }
 ];
+
+export const INITIAL_ACTIVITY_LOGS = INITIAL_LOGS;

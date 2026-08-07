@@ -66,10 +66,11 @@ export const UserManagement = ({ searchQuery, setToast }) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchAllUsers();
-    if (!error && data && data.length > 0) {
+    if (!error && Array.isArray(data)) {
       setUsers(data);
     } else {
-      setUsers(store.getUsers());
+      setUsers([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load user accounts.' });
     }
     setLoading(false);
   };
@@ -385,7 +386,7 @@ export const UserManagement = ({ searchQuery, setToast }) => {
               className="input-control"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g. Alhaj Mubarak Ahmad"
+              placeholder="e.g. Tariq Malik"
             />
           </div>
 

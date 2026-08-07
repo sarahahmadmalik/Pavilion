@@ -58,10 +58,11 @@ export const OfficeBillPayments = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchBillPayments();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      setItems(store.getBillPayments());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load bill payment records.' });
     }
     setLoading(false);
   };

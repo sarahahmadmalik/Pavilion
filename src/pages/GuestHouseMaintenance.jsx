@@ -63,10 +63,11 @@ export const GuestHouseMaintenance = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchGHMaintenance();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      setItems(store.getGHMaintenance());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load maintenance tickets.' });
     }
     setLoading(false);
   };

@@ -160,7 +160,6 @@ CREATE POLICY "Allow authenticated read/write on office_maintenance" ON public.o
 DROP POLICY IF EXISTS "Allow authenticated read/write on activity_logs" ON public.activity_logs;
 CREATE POLICY "Allow authenticated read/write on activity_logs" ON public.activity_logs FOR ALL USING (true);
 
-
 -- 4. CLEAR EXISTING SEED DATA
 TRUNCATE TABLE public.activity_logs CASCADE;
 TRUNCATE TABLE public.user_permissions CASCADE;
@@ -183,17 +182,16 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 INSERT INTO auth.users (
     id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, recovery_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
 ) VALUES 
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@mtaghana.org', crypt('SuperAdmin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Alhaj Mubarak Ahmad"}', false, NOW(), NOW()),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@mtaghana.org', crypt('Admin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Rashid Osei Boateng"}', false, NOW(), NOW()),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'staff@mtaghana.org', crypt('Staff123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Ibrahim Kwame Mensah"}', false, NOW(), NOW())
-ON CONFLICT (id) DO UPDATE SET encrypted_password = EXCLUDED.encrypted_password;
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@mtaghana.org', crypt('SuperAdmin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Tariq Malik"}', false, NOW(), NOW()),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@mtaghana.org', crypt('Admin123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Usman Khan"}', false, NOW(), NOW()),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'staff@mtaghana.org', crypt('Staff123!', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Hamza Ahmed"}', false, NOW(), NOW())
+ON CONFLICT (id) DO UPDATE SET encrypted_password = EXCLUDED.encrypted_password, raw_user_meta_data = EXCLUDED.raw_user_meta_data;
 
 INSERT INTO public.users (id, name, email, role, status, avatar) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Alhaj Mubarak Ahmad', 'superadmin@mtaghana.org', 'super_admin', 'Active', NULL),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Rashid Osei Boateng', 'admin@mtaghana.org', 'admin', 'Active', NULL),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Ibrahim Kwame Mensah', 'staff@mtaghana.org', 'staff', 'Active', NULL)
-ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role, status = EXCLUDED.status;
-
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Tariq Malik', 'superadmin@mtaghana.org', 'super_admin', 'Active', NULL),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', 'admin@mtaghana.org', 'admin', 'Active', NULL),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', 'staff@mtaghana.org', 'staff', 'Active', NULL)
+ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status;
 
 -- Staff Permissions Matrix
 INSERT INTO public.user_permissions (user_id, module_key, can_view, can_add, can_edit, can_delete) VALUES
@@ -213,28 +211,28 @@ ON CONFLICT (user_id, module_key) DO UPDATE SET
 
 -- Guest List
 INSERT INTO public.guest_list (name, check_in, check_out, country, room_allocated, purpose_of_stay) VALUES
-('Abdul Rashid', '2026-08-01', '2026-08-10', 'United Kingdom', 'VIP Suite 101', 'Annual Conference & Inspection Tour'),
-('Tariq Mahmood', '2026-08-03', '2026-08-07', 'Pakistan', 'Room 204', 'Technical Media Broadcast Setup'),
-('Fatimah', '2026-08-04', '2026-08-08', 'Ghana', 'Room 105', 'Institutional Executive Audit Meeting'),
-('Brother Usman Siddique', '2026-07-28', '2026-08-05', 'Nigeria', 'Room 202', 'Regional MTA Africa Delegation'),
-('Sister Maryam Mensah', '2026-08-02', '2026-08-12', 'Canada', 'VIP Suite 102', 'Documentation & Media Production'),
-('Dr. Khalid Mahmood', '2026-08-05', '2026-08-15', 'Germany', 'VIP Suite 103', 'Medical Outreach Consultation'),
-('Hafiz Bilal Ahmed', '2026-08-06', '2026-08-09', 'South Africa', 'Room 201', 'Broadcasting Engineering Review');
+('Bilal Chaudhry', '2026-08-01', '2026-08-10', 'Pakistan', 'VIP Suite 101', 'Annual Conference & Inspection Tour'),
+('Zeeshan Ali', '2026-08-03', '2026-08-07', 'Pakistan', 'Room 204', 'Technical Media Broadcast Setup'),
+('Farhan Akhtar', '2026-08-04', '2026-08-08', 'Pakistan', 'Room 105', 'Regional Executive Audit Meeting'),
+('Zubair Hassan', '2026-07-28', '2026-08-05', 'Pakistan', 'Room 202', 'Regional MTA Africa Delegation'),
+('Faisal Saeed', '2026-08-02', '2026-08-12', 'Pakistan', 'VIP Suite 102', 'Documentation & Media Production'),
+('Ahsan Raza', '2026-08-05', '2026-08-15', 'Pakistan', 'VIP Suite 103', 'Medical Outreach Consultation'),
+('Danish Iqbal', '2026-08-06', '2026-08-09', 'Pakistan', 'Room 201', 'Broadcasting Engineering Review');
 
 -- Guest House Maintenance
 INSERT INTO public.guest_house_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES
-('2026-08-02', 'Air Conditioner leaking water in VIP Suite 101', 'In Progress', 'Technician replaced drain line gasket. Testing unit.', 'VIP Suite 101', 'Kwame Mensah (HVAC Tech)', 450.00),
-('2026-08-01', 'Water heater thermostat fault in Room 204', 'Resolved', 'Replaced 2000W heating element and wiring.', 'Room 204', 'Kofi Darko (Plumber)', 320.00),
+('2026-08-02', 'Air Conditioner leaking water in VIP Suite 101', 'In Progress', 'Technician replaced drain line gasket.', 'VIP Suite 101', 'Kamran Shah (HVAC Tech)', 450.00),
+('2026-08-01', 'Water heater thermostat fault in Room 204', 'Resolved', 'Replaced 2000W heating element.', 'Room 204', 'Adnan Siddiqui (Plumber)', 320.00),
 ('2026-08-03', 'Master bathroom door lock latch stuck', 'Open', NULL, 'Room 105', 'Unassigned', 0.00),
-('2026-07-29', 'Ceiling fan speed regulator replacement', 'Resolved', 'Replaced with 5-speed heavy-duty regulator.', 'Linen Closet / Reception', 'Isaac Appiah', 180.00),
+('2026-07-29', 'Ceiling fan speed regulator replacement', 'Resolved', 'Replaced with 5-speed heavy-duty regulator.', 'Linen Closet / Reception', 'Waqas Butt', 180.00),
 ('2026-08-04', 'VIP Lounge Smart TV HDMI port loose connection', 'Open', NULL, 'VIP Main Lounge', 'Unassigned', 0.00);
 
 -- Guest House Inventory
 INSERT INTO public.guest_house_inventory (item, qty, condition, location, notes) VALUES
-('Egyptian Cotton Bedding Sets', 24, 'Good', 'Linen Store Room', 'Purchased Jan 2026 for VIP Delegation suites'),
+('Egyptian Cotton Bedding Sets', 24, 'Good', 'Linen Store Room', 'Purchased Jan 2026'),
 ('Orthopedic King Mattresses', 12, 'Good', 'VIP Suites (101-106)', 'High durability institutional grade'),
-('Daikin 2.0 HP Inverter AC Units', 18, 'Fair', 'Guest Rooms Block A & B', 'Serviced quarterly by HVAC contractor'),
-('Phillips HD LED Televisions (55 inch)', 8, 'Good', 'VIP Suites & Main Lounge', 'Connected to MTA Africa Satellite Dish'),
+('Daikin 2.0 HP Inverter AC Units', 18, 'Fair', 'Guest Rooms Block A & B', 'Serviced quarterly'),
+('Phillips HD LED Televisions (55 inch)', 8, 'Good', 'VIP Suites & Main Lounge', 'Connected to MTA Satellite'),
 ('Bath Towels Set (White Extra Large)', 40, 'Fair', 'Laundry Storage Closet', '8 sets flagged for replacement'),
 ('Electric Kettles (Stainless Steel)', 14, 'Good', 'All Guest Suites', 'Checked during check-in protocol');
 
@@ -258,46 +256,13 @@ INSERT INTO public.office_assets (barcode, description, status, location) VALUES
 
 -- Office Maintenance
 INSERT INTO public.office_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES
-('2026-08-01', 'Perkins 150kVA Standby Generator monthly servicing & oil change', 'In Progress', 'Engine oil drained, new filters installed. Load test pending.', 'Generator House', 'Mantrac Ghana Engineers', 1850.00),
-('2026-07-30', 'Studio B Acoustic Panel wall mounting & soundproofing repair', 'Resolved', 'Re-anchored 6 soundproof panels with steel brackets.', 'Studio B', 'Samuel Addo (Acoustic Specialist)', 650.00),
-('2026-08-03', 'Server Room Dedicated Precision AC Unit high temperature alarm', 'Open', 'Contractor scheduled for urgent Freon gas pressure check.', 'Server Room', 'Unassigned', 0.00),
-('2026-07-28', 'UPS Battery Bank Cell 04 voltage calibration', 'Resolved', 'Calibrated battery management system and replaced cell 04.', 'Power Room', 'APC Certified Tech', 920.00);
+('2026-08-01', 'Perkins 150kVA Standby Generator monthly servicing & oil change', 'In Progress', 'Engine oil drained, new filters installed.', 'Generator House', 'Mantrac Engineers', 1850.00),
+('2026-07-30', 'Studio B Acoustic Panel wall mounting & soundproofing repair', 'Resolved', 'Re-anchored 6 soundproof panels.', 'Studio B', 'Rehan Mahmood (Acoustic Spec)', 650.00),
+('2026-08-03', 'Server Room Dedicated Precision AC Unit high temperature alarm', 'Open', 'Contractor scheduled for Freon gas pressure check.', 'Server Room', 'Unassigned', 0.00),
+('2026-07-28', 'UPS Battery Bank Cell 04 voltage calibration', 'Resolved', 'Calibrated battery management system.', 'Power Room', 'APC Tech', 920.00);
 
 -- Activity Logs
 INSERT INTO public.activity_logs (timestamp, user_id, user_name, user_avatar, action, module_name, record_affected, details) VALUES
-(NOW() - INTERVAL '15 minutes', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Alhaj Mubarak Ahmad', NULL, 'Created', 'Guest List', 'Dr. Khalid Mahmood', '{"checkIn": "2026-08-05", "country": "Germany"}'),
-(NOW() - INTERVAL '45 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Rashid Osei Boateng', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}'),
-(NOW() - INTERVAL '2 hours', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Ibrahim Kwame Mensah', NULL, 'Created', 'Office Bill Payments', 'Electricity Company of Ghana (ECG)', '{"amount": 3450.00, "chequeNo": "CHK-2026-0891"}'),
-(NOW() - INTERVAL '4 hours', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Alhaj Mubarak Ahmad', NULL, 'Created', 'Office Asset List', 'Dell Latitude 5540 i7 Studio Laptop', '{"barcode": "MTA-AST-90214"}');
-
--- 7. DATABASE INDEXES FOR FAST BACKEND SEARCHING & FILTERING
-CREATE INDEX IF NOT EXISTS idx_guest_list_country ON public.guest_list(country);
-CREATE INDEX IF NOT EXISTS idx_guest_list_check_in ON public.guest_list(check_in);
-CREATE INDEX IF NOT EXISTS idx_guest_list_name ON public.guest_list(name);
-
-CREATE INDEX IF NOT EXISTS idx_gh_maint_status ON public.guest_house_maintenance(status);
-CREATE INDEX IF NOT EXISTS idx_gh_maint_reported_on ON public.guest_house_maintenance(reported_on);
-CREATE INDEX IF NOT EXISTS idx_gh_maint_cost ON public.guest_house_maintenance(cost);
-
-CREATE INDEX IF NOT EXISTS idx_gh_inv_condition ON public.guest_house_inventory(condition);
-CREATE INDEX IF NOT EXISTS idx_gh_inv_qty ON public.guest_house_inventory(qty);
-
-CREATE INDEX IF NOT EXISTS idx_bills_date ON public.office_bill_payments(date);
-CREATE INDEX IF NOT EXISTS idx_bills_amount ON public.office_bill_payments(amount);
-CREATE INDEX IF NOT EXISTS idx_bills_company ON public.office_bill_payments(company);
-
-CREATE INDEX IF NOT EXISTS idx_assets_status ON public.office_assets(status);
-CREATE INDEX IF NOT EXISTS idx_assets_barcode ON public.office_assets(barcode);
-
-CREATE INDEX IF NOT EXISTS idx_office_maint_status ON public.office_maintenance(status);
-CREATE INDEX IF NOT EXISTS idx_office_maint_reported_on ON public.office_maintenance(reported_on);
-CREATE INDEX IF NOT EXISTS idx_office_maint_cost ON public.office_maintenance(cost);
-
-CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON public.activity_logs(timestamp);
-CREATE INDEX IF NOT EXISTS idx_logs_module_name ON public.activity_logs(module_name);
-CREATE INDEX IF NOT EXISTS idx_logs_action ON public.activity_logs(action);
-
-CREATE INDEX IF NOT EXISTS idx_users_email ON public.users(email);
-CREATE INDEX IF NOT EXISTS idx_users_role ON public.users(role);
-CREATE INDEX IF NOT EXISTS idx_user_perms_user ON public.user_permissions(user_id, module_key);
-
+(NOW() - INTERVAL '15 minutes', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Tariq Malik', NULL, 'Created', 'Guest List', 'Bilal Chaudhry', '{"checkIn": "2026-08-01", "country": "Pakistan"}'),
+(NOW() - INTERVAL '45 minutes', 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', 'Usman Khan', NULL, 'Edited', 'Guest House Maintenance', 'Air Conditioner leaking water in VIP Suite 101', '{"status": "In Progress"}'),
+(NOW() - INTERVAL '2 hours', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', NULL, 'Created', 'Office Bill Payments', 'Electricity Company of Ghana (ECG)', '{"amount": 3450.00, "chequeNo": "CHK-2026-0891"}');

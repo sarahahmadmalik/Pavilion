@@ -59,10 +59,11 @@ export const OfficeAssetList = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchOfficeAssets();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      setItems(store.getOfficeAssets());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load office asset records.' });
     }
     setLoading(false);
   };

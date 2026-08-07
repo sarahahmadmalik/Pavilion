@@ -58,10 +58,11 @@ export const GuestHouseInventory = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchGHInventory();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      setItems(store.getGHInventory());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load inventory items.' });
     }
     setLoading(false);
   };

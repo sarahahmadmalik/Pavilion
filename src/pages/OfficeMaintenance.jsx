@@ -63,10 +63,11 @@ export const OfficeMaintenance = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchOfficeMaintenance();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      setItems(store.getOfficeMaintenance());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load office maintenance tickets.' });
     }
     setLoading(false);
   };

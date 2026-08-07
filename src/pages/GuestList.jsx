@@ -62,11 +62,11 @@ export const GuestList = (props) => {
   const loadData = async () => {
     setLoading(true);
     const { data, error } = await fetchGuests();
-    if (!error && data) {
+    if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
-      // Fallback to local store if db is offline/empty
-      setItems(store.getGuests());
+      setItems([]);
+      setToast?.({ type: 'error', message: 'Database connection offline. Could not load guest records.' });
     }
     setLoading(false);
   };
@@ -391,7 +391,7 @@ export const GuestList = (props) => {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               onBlur={() => handleBlur('name')}
-              placeholder="e.g. Maulana Abdul Rashid"
+              placeholder="e.g. Bilal Chaudhry"
             />
             {(touched.name || submitted) && !formData.name.trim() && (
               <span className="input-error-msg">Full Name is required.</span>

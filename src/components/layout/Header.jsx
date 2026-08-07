@@ -5,7 +5,6 @@ import {
   Sun,
   Moon,
   Bell,
-  Search,
   User,
   LogOut,
   ChevronDown,
@@ -13,13 +12,14 @@ import {
   ShieldCheck,
   Menu,
   Settings,
-  ChevronRight
 } from 'lucide-react';
 import {
   AnimatedDropdown,
   DropdownItem,
   DropdownDivider
 } from '../common/AnimatedDropdown.jsx';
+import { GlobalSearchBar } from './GlobalSearchBar.jsx';
+import { UserAvatar } from '../common/UserAvatar.jsx';
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
@@ -34,140 +34,140 @@ const ROLE_ICONS = {
 };
 
 export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery, unreadCount, onOpenNotifications, onToggleMobileSidebar }) => {
-  const { currentUser, logout, switchRole } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
 
   const firstName = currentUser?.name?.split(' ')[0] || 'User';
   const isDashboard = activePage === 'dashboard';
-
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
+
+  // Notification rules: Bell is ONLY shown to super_admin or admin
+  const canReceiveNotifications = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
 
   return (
     <header style={{
-      height: '80px',
+      height: '68px',
+      minHeight: '68px',
+      flexShrink: 0,
+      boxSizing: 'border-box',
       backgroundColor: 'var(--bg-header)',
       borderBottom: '1px solid var(--border-header)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '0 1.25rem',
+      padding: '0 1.5rem',
       position: 'sticky',
       top: 0,
       zIndex: 90,
+      gap: '0.75rem',
       transition: 'background-color var(--transition-normal)'
     }}>
-      {/* Left: Mobile Hamburger + Welcome text on dashboard */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1, minWidth: 0 }}>
-        {/* Mobile Hamburger Toggle Button */}
+
+      {/* ─── Left: Mobile Hamburger + Welcome / Global Search Bar ─────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+
+        {/* Mobile Hamburger */}
         <button
           onClick={onToggleMobileSidebar}
           className="btn btn-ghost header-mobile-hamburger"
-          style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)' }}
+          style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
           title="Open Menu"
         >
           <Menu size={22} color="var(--text-main)" />
         </button>
 
-        {/* Welcome message on dashboard, or search elsewhere */}
-        {isDashboard ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{
-              fontSize: '1.375rem',
+        {/* Welcome message on desktop dashboard */}
+        {isDashboard && (
+          <span
+            className="desktop-only-welcome"
+            style={{
+              fontSize: '1.125rem',
               fontWeight: 800,
               color: 'var(--text-main)',
               whiteSpace: 'nowrap',
-              letterSpacing: '-0.02em'
-            }}>
-              Welcome back, {firstName}
-            </span>
-          </div>
-        ) : null}
+              letterSpacing: '-0.02em',
+              flexShrink: 0
+            }}
+          >
+            Welcome back, {firstName}
+          </span>
+        )}
 
-        <div className="header-search-container" style={{ position: 'relative', width: '100%', maxWidth: '280px' }}>
-          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            className="input-control"
-            placeholder="Search records, guests, assets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '2.25rem', fontSize: '0.8125rem' }}
+        {/* Global Search Bar */}
+        <div style={{ flex: 1, maxWidth: '360px', minWidth: '120px' }}>
+          <GlobalSearchBar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            setActivePage={setActivePage}
           />
         </div>
       </div>
 
-      {/* Right: Theme Toggle + Notifications + Profile */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
+      {/* ─── Right: Theme Toggle + Notifications + Profile ────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
 
-        {/* Theme Toggle */}
+        {/* Theme Toggle Button — visible on desktop / tablet (>768px) */}
         <button
           onClick={toggleTheme}
-          className="btn btn-ghost"
+          className="btn btn-ghost desktop-theme-toggle"
           style={{ padding: '0.5rem', borderRadius: '50%' }}
-          title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+          title={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
         >
-          {theme === 'light' ? <Moon size={18} color="#475569" /> : <Sun size={18} color="#F59E0B" />}
+          {theme === 'light'
+            ? <Moon size={18} color="var(--text-muted)" />
+            : <Sun size={18} color="#F59E0B" />}
         </button>
 
-        {/* Notification Bell */}
-        <button
-          onClick={onOpenNotifications}
-          className="btn btn-ghost"
-          style={{ padding: '0.5rem', borderRadius: '50%', position: 'relative' }}
-          title="Notifications"
-        >
-          <Bell size={18} color="var(--text-muted)" />
-          {unreadCount > 0 && (
-            <span style={{
-              position: 'absolute',
-              top: '2px',
-              right: '2px',
-              minWidth: '16px',
-              height: '16px',
-              backgroundColor: '#EF4444',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '0.625rem',
-              fontWeight: 'bold',
-              padding: '0 4px'
-            }}>
-              {unreadCount > 99 ? '99+' : unreadCount}
-            </span>
-          )}
-        </button>
+        {/* Notification Bell — ONLY for super_admin and admin */}
+        {canReceiveNotifications && (
+          <button
+            onClick={onOpenNotifications}
+            className="btn btn-ghost"
+            style={{ padding: '0.5rem', borderRadius: '50%', position: 'relative' }}
+            title="System Notifications"
+          >
+            <Bell size={18} color="var(--text-muted)" />
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: '2px',
+                right: '2px',
+                minWidth: '16px',
+                height: '16px',
+                backgroundColor: '#EF4444',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '0.5625rem',
+                fontWeight: 700,
+                padding: '0 3px',
+                lineHeight: 1
+              }}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+        )}
 
-        {/* User Profile Avatar Dropdown */}
+        {/* Profile Avatar Dropdown */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => { setShowProfileMenu(!showProfileMenu); setShowRoleMenu(false); }}
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '0.25rem',
-              borderRadius: 'var(--radius-md)'
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '0.25rem 0.375rem',
+              borderRadius: 'var(--radius-md)',
+              transition: 'background 0.15s ease'
             }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
           >
-            <img
-              src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-              alt={currentUser?.name}
-              style={{
-                width: '34px',
-                height: '34px',
-                borderRadius: '50%',
-                objectFit: 'cover',
-                border: '2px solid var(--color-primary)'
-              }}
-            />
+            <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size={32} />
             <div className="header-user-info" style={{ textAlign: 'left' }}>
               <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
                 {currentUser?.name}
@@ -186,7 +186,7 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             />
           </button>
 
-          {/* Animated Profile Dropdown */}
+          {/* Profile Dropdown */}
           <AnimatedDropdown
             isOpen={showProfileMenu}
             onClose={() => setShowProfileMenu(false)}
@@ -194,13 +194,9 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             align="right"
           >
             {/* User Info Header */}
-            <div style={{ padding: '0.625rem 0.75rem 0.5rem', marginBottom: '0.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                <img
-                  src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-                  alt={currentUser?.name}
-                  style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--color-primary)' }}
-                />
+            <div style={{ padding: '0.75rem 0.875rem 0.625rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.5rem' }}>
+                <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size={38} />
                 <div>
                   <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', display: 'block', lineHeight: 1.2 }}>
                     {currentUser?.name}
@@ -213,17 +209,12 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
 
               {/* Role badge */}
               <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.375rem',
-                marginTop: '0.625rem',
+                display: 'inline-flex', alignItems: 'center', gap: '0.375rem',
                 padding: '0.25rem 0.625rem',
                 borderRadius: 'var(--radius-full)',
                 backgroundColor: 'var(--color-primary-light)',
                 color: 'var(--color-primary)',
-                fontSize: '0.6875rem',
-                fontWeight: 700,
-                textTransform: 'capitalize'
+                fontSize: '0.6875rem', fontWeight: 700, textTransform: 'capitalize'
               }}>
                 {ROLE_ICONS[currentUser?.role]}
                 {roleLabel}
@@ -232,15 +223,25 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
 
             <DropdownDivider />
 
+            {/* Theme Toggle option inside profile dropdown — visible on mobile (<=768px) */}
+            <div className="mobile-only-theme-dropdown">
+              <DropdownItem
+                icon={theme === 'light' ? <Moon size={16} color="#475569" /> : <Sun size={16} color="#F59E0B" />}
+                label={theme === 'light' ? 'Switch to Dark Mode' : 'Switch to Light Mode'}
+                onClick={toggleTheme}
+              />
+            </div>
 
             <DropdownItem
-              icon={<Settings />}
+              icon={<Settings size={16} />}
               label="Profile & Settings"
               onClick={() => { setActivePage('profile'); setShowProfileMenu(false); }}
             />
 
+            <DropdownDivider />
+
             <DropdownItem
-              icon={<LogOut />}
+              icon={<LogOut size={16} />}
               label="Sign Out"
               danger
               onClick={() => { logout(); setShowProfileMenu(false); }}

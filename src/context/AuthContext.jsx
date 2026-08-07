@@ -14,12 +14,17 @@ export const AuthProvider = ({ children }) => {
     let mounted = true;
 
     const initSession = async () => {
-      setAuthLoading(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user && mounted) {
-        await loadUserProfile(session.user.id);
+      try {
+        setAuthLoading(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user && mounted) {
+          await loadUserProfile(session.user.id);
+        }
+      } catch (err) {
+        console.error('Session init error:', err);
+      } finally {
+        if (mounted) setAuthLoading(false);
       }
-      if (mounted) setAuthLoading(false);
     };
 
     initSession();
@@ -28,12 +33,14 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       if (event === 'SIGNED_IN' && session?.user) {
+        setAuthLoading(true);
         await loadUserProfile(session.user.id);
+        if (mounted) setAuthLoading(false);
       } else if (event === 'SIGNED_OUT') {
         setCurrentUser(null);
         setUsers([]);
+        if (mounted) setAuthLoading(false);
       }
-      setAuthLoading(false);
     });
 
     return () => {

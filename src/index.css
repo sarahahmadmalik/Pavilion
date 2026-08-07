@@ -223,6 +223,16 @@ input, select, textarea, button {
   border-radius: var(--radius-sm);
 }
 
+.btn-export {
+  background-color: transparent;
+  color: #10B981;
+  border: 1.5px solid #10B981;
+}
+.btn-export:hover {
+  background-color: rgba(16, 185, 129, 0.1);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+}
+
 /* Table Styles */
 .table-container {
   width: 100%;
@@ -238,11 +248,11 @@ input, select, textarea, button {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
-  min-width: 650px; /* Ensures clean scroll on small screens */
+  min-width: 800px; /* Ensures clean, un-squished columns on small screens */
 }
 
 .data-table th {
-  padding: 0.875rem 1.25rem;
+  padding: 0.875rem 1.125rem;
   background-color: var(--bg-card-hover);
   color: var(--text-muted);
   font-size: 0.75rem;
@@ -251,13 +261,15 @@ input, select, textarea, button {
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-color);
   user-select: none;
+  white-space: nowrap;
 }
 
 .data-table td {
-  padding: 0.875rem 1.25rem;
+  padding: 0.875rem 1.125rem;
   border-bottom: 1px solid var(--border-color);
   color: var(--text-main);
   font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 .data-table tbody tr {
@@ -266,6 +278,55 @@ input, select, textarea, button {
 
 .data-table tbody tr:hover {
   background-color: var(--bg-card-hover);
+}
+
+/* Page Header Layouts & Responsive Actions */
+.page-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  width: 100%;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .page-header-container {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .page-header-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+  .page-header-actions .btn {
+    flex: 1 1 auto;
+    min-width: 90px;
+    justify-content: center;
+    padding: 0.5rem 0.625rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Dashboard Main 2-Column Grid (Left: Charts, Right: Activity Feed) */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-main-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Status Badges */
@@ -296,6 +357,14 @@ input, select, textarea, button {
   background-color: var(--status-blue-bg);
   color: var(--status-blue-text);
 }
+.badge-purple {
+  background-color: rgba(124, 58, 237, 0.14);
+  color: #7C3AED;
+}
+.badge-teal {
+  background-color: rgba(13, 148, 136, 0.14);
+  color: #0D9488;
+}
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
@@ -322,6 +391,30 @@ input, select, textarea, button {
   display: none !important;
 }
 
+/* Responsive Theme Toggle */
+.desktop-theme-toggle {
+  display: inline-flex !important;
+}
+.mobile-only-theme-dropdown {
+  display: none !important;
+}
+
+/* Viewport Overflow Protection */
+html, body, #root {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+/* Mobile Filter Drawer Uniform Control Widths */
+.mobile-filter-drawer-container input,
+.mobile-filter-drawer-container select,
+.mobile-filter-drawer-container button,
+.mobile-filter-drawer-container div {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
 /* Tablet View (Max Width 1024px) */
 @media (max-width: 1024px) {
   .main-content-wrapper {
@@ -340,9 +433,14 @@ input, select, textarea, button {
   .mobile-only-btn {
     display: flex !important;
   }
-
-  .header-search-container {
-    display: none !important; /* Hide header search input on small screens */
+  .desktop-theme-toggle {
+    display: none !important;
+  }
+  .mobile-only-theme-dropdown {
+    display: flex !important;
+  }
+  .desktop-only-welcome {
+    display: none !important;
   }
 
   .header-user-info {
@@ -364,7 +462,15 @@ input, select, textarea, button {
   }
 
   .main-content-wrapper {
-    padding: 1rem !important;
+    padding: 0.875rem !important;
+  }
+
+  .table-container {
+    border-radius: var(--radius-md);
+  }
+
+  .data-table {
+    min-width: 680px !important;
   }
 }
 

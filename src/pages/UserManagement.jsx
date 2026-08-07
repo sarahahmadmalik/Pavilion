@@ -17,6 +17,7 @@ import { Plus, Search, Edit, Trash2, Key, Ban, Shield, Lock, Settings, X } from 
 import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
+import { UserAvatar } from '../components/common/UserAvatar.jsx';
 
 export const UserManagement = ({ searchQuery, setToast }) => {
   const { currentUser, refreshUsers } = useAuth();
@@ -94,10 +95,10 @@ export const UserManagement = ({ searchQuery, setToast }) => {
     setFormData({
       name: '',
       email: '',
-      password: 'password123',
+      password: '',
       role: 'staff',
       status: 'Active',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150',
+      avatar: '',
       permissions: {
         guest_list: { view: true, add: true, edit: false, delete: false },
         gh_maintenance: { view: false, add: false, edit: false, delete: false },
@@ -298,11 +299,7 @@ export const UserManagement = ({ searchQuery, setToast }) => {
                 <tr key={user.id}>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <img
-                        src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'}
-                        alt={user.name}
-                        style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
-                      />
+                      <UserAvatar name={user.name} src={user.avatar} size={36} />
                       <div>
                         <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-main)', display: 'block' }}>
                           {user.name}

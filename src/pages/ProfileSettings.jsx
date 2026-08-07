@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { User, Lock, Sun, Moon, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { UserAvatar } from '../components/common/UserAvatar.jsx';
+import { ButtonSpinner } from '../components/common/Loader.jsx';
+import { supabase } from '../lib/supabase.js';
 
 export const ProfileSettings = ({ setToast }) => {
   const { currentUser } = useAuth();
@@ -12,15 +15,36 @@ export const ProfileSettings = ({ setToast }) => {
     newPassword: '',
     confirmPassword: ''
   });
+  const [updating, setUpdating] = useState(false);
 
-  const handlePasswordChange = (e) => {
+  const handlePasswordChange = async (e) => {
     e.preventDefault();
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setToast({ type: 'error', message: 'New password and confirmation do not match!' });
+    if (passwordData.newPassword.length < 6) {
+      setToast?.({ type: 'error', message: 'New password must be at least 6 characters long.' });
       return;
     }
-    setToast({ type: 'success', message: 'Your profile password has been updated successfully.' });
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setToast?.({ type: 'error', message: 'New password and confirmation do not match!' });
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const { error } = await supabase.auth.updateUser({
+        password: passwordData.newPassword
+      });
+
+      if (error) {
+        setToast?.({ type: 'error', message: error.message || 'Failed to update password.' });
+      } else {
+        setToast?.({ type: 'success', message: 'Your security password has been updated successfully!' });
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      }
+    } catch (err) {
+      setToast?.({ type: 'error', message: err.message || 'An unexpected error occurred.' });
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (
@@ -47,11 +71,7 @@ export const ProfileSettings = ({ setToast }) => {
         alignItems: 'center',
         gap: '1.5rem'
       }}>
-        <img
-          src={currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
-          alt={currentUser?.name}
-          style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--color-primary)' }}
-        />
+        <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size={72} border="3px solid var(--color-primary)" />
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
@@ -153,8 +173,8 @@ export const ProfileSettings = ({ setToast }) => {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
-            <button type="submit" className="btn btn-primary">
-              Update Password
+            <button type="submit" className="btn btn-primary" disabled={updating}>
+              {updating ? <ButtonSpinner text="Updating Password..." color="#fff" /> : 'Update Password'}
             </button>
           </div>
         </form>

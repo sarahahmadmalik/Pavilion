@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
-import { NotificationProvider } from './context/NotificationContext.jsx';
 import { Layout } from './components/layout/Layout.jsx';
 import { Login } from './pages/Login.jsx';
 import { Dashboard } from './pages/Dashboard.jsx';
@@ -15,6 +14,7 @@ import { ActivityLog } from './pages/ActivityLog.jsx';
 import { UserManagement } from './pages/UserManagement.jsx';
 import { ProfileSettings } from './pages/ProfileSettings.jsx';
 import { PageLoader } from './components/common/Loader.jsx';
+import { ProtectedRoute } from './components/common/ProtectedRoute.jsx';
 
 const MainContent = () => {
   const { currentUser, authLoading } = useAuth();
@@ -22,7 +22,7 @@ const MainContent = () => {
 
   // Show full-page loader while Supabase checks the session
   if (authLoading) {
-    return <PageLoader message="Loading MTA Ghana Portal..." />;
+    return <PageLoader message="Initializing MTA Ghana Portal..." />;
   }
 
   if (!currentUser) {
@@ -31,17 +31,60 @@ const MainContent = () => {
 
   const renderPageComponent = () => {
     switch (activePage) {
-      case 'dashboard':        return <Dashboard setActivePage={setActivePage} />;
-      case 'guest_list':       return <GuestList />;
-      case 'gh_maintenance':   return <GuestHouseMaintenance />;
-      case 'gh_inventory':     return <GuestHouseInventory />;
-      case 'office_bills':     return <OfficeBillPayments />;
-      case 'office_assets':    return <OfficeAssetList />;
-      case 'office_maintenance': return <OfficeMaintenance />;
-      case 'activity_log':     return <ActivityLog />;
-      case 'user_management':  return <UserManagement />;
-      case 'profile':          return <ProfileSettings />;
-      default:                 return <Dashboard setActivePage={setActivePage} />;
+      case 'dashboard':
+        return <Dashboard setActivePage={setActivePage} />;
+      case 'guest_list':
+        return (
+          <ProtectedRoute moduleKey="guest_list" moduleName="Guest List Management">
+            <GuestList />
+          </ProtectedRoute>
+        );
+      case 'gh_maintenance':
+        return (
+          <ProtectedRoute moduleKey="gh_maintenance" moduleName="Guest House Maintenance">
+            <GuestHouseMaintenance />
+          </ProtectedRoute>
+        );
+      case 'gh_inventory':
+        return (
+          <ProtectedRoute moduleKey="gh_inventory" moduleName="Guest House Inventory">
+            <GuestHouseInventory />
+          </ProtectedRoute>
+        );
+      case 'office_bills':
+        return (
+          <ProtectedRoute moduleKey="office_bills" moduleName="Office Bill Payments">
+            <OfficeBillPayments />
+          </ProtectedRoute>
+        );
+      case 'office_assets':
+        return (
+          <ProtectedRoute moduleKey="office_assets" moduleName="Office Asset List">
+            <OfficeAssetList />
+          </ProtectedRoute>
+        );
+      case 'office_maintenance':
+        return (
+          <ProtectedRoute moduleKey="office_maintenance" moduleName="Office Maintenance">
+            <OfficeMaintenance />
+          </ProtectedRoute>
+        );
+      case 'activity_log':
+        return (
+          <ProtectedRoute moduleKey="activity_log" moduleName="System Audit & Activity Logs">
+            <ActivityLog />
+          </ProtectedRoute>
+        );
+      case 'user_management':
+        return (
+          <ProtectedRoute moduleKey="user_management" moduleName="User Account Management">
+            <UserManagement />
+          </ProtectedRoute>
+        );
+      case 'profile':
+        return <ProfileSettings />;
+      default:
+        return <Dashboard setActivePage={setActivePage} />;
     }
   };
 
@@ -56,9 +99,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <NotificationProvider>
-          <MainContent />
-        </NotificationProvider>
+        <MainContent />
       </AuthProvider>
     </ThemeProvider>
   );

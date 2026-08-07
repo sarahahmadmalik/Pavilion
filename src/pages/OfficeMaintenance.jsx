@@ -12,13 +12,14 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Wrench, X } from 'lucide-react';
+import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Wrench, X, Upload } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { DatePicker } from '../components/common/DatePicker.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
+import { ResponsiveFilterBar } from '../components/common/ResponsiveFilterBar.jsx';
 
-export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast }) => {
+export const OfficeMaintenance = ({ searchQuery, triggerExportModal, triggerImportModal, setToast }) => {
   const { currentUser, hasModulePermission } = useAuth();
   const canView = hasModulePermission('office_maintenance', 'view');
   const canAdd = hasModulePermission('office_maintenance', 'add');
@@ -100,9 +101,9 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
       issue: '',
       status: 'Open',
       updates: '',
-      location: 'Central Headquarters',
+      location: '',
       nameOfWorker: '',
-      cost: 0
+      cost: ''
     });
     setIsSlideOpen(true);
   };
@@ -181,19 +182,28 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="page-header-container">
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            Office Facilities & Generator Maintenance
+            Central Office Maintenance & Repairs
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
             Track office electrical, plumbing, generator servicing, and building infrastructure repairs.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <div className="page-header-actions">
+          {canAdd && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => triggerImportModal?.('office_maintenance')}
+              title="Import records from Excel spreadsheet"
+            >
+              <Upload size={16} /> Import
+            </button>
+          )}
           <button
-            className="btn btn-secondary"
+            className="btn btn-export"
             onClick={() => triggerExportModal?.('Office Maintenance', filteredItems, exportColumns)}
           >
             <FileSpreadsheet size={16} /> Export
@@ -206,31 +216,14 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
         </div>
       </div>
 
-      {/* Comprehensive Filter Bar */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        padding: '1rem',
-        backgroundColor: 'var(--bg-card)',
-        borderRadius: 'var(--radius-md)',
-        border: '1px solid var(--border-color)'
-      }}>
-        {/* Search */}
-        <div style={{ position: 'relative', minWidth: '200px', flex: 1 }}>
-          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-          <input
-            type="text"
-            className="input-control"
-            placeholder="Search issue or location..."
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            style={{ paddingLeft: '2.25rem', fontSize: '0.8125rem' }}
-          />
-        </div>
-
-        {/* Status */}
+      {/* Responsive Filter Bar */}
+      <ResponsiveFilterBar
+        searchVal={localSearch}
+        onSearchChange={setLocalSearch}
+        searchPlaceholder="Search issue or location..."
+        activeFilterCount={(statusFilter !== 'All' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0) + (minCost ? 1 : 0) + (maxCost ? 1 : 0)}
+        onClearFilters={resetFilters}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Status:</span>
           <CustomSelect
@@ -246,7 +239,6 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
           />
         </div>
 
-        {/* Date Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>From:</span>
           <DatePicker
@@ -267,7 +259,6 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
           />
         </div>
 
-        {/* Cost Range Filters */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>Min GHS:</span>
           <input
@@ -291,17 +282,7 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
             style={{ width: '90px', padding: '0.4rem 0.6rem', fontSize: '0.8125rem' }}
           />
         </div>
-
-        {hasActiveFilters && (
-          <button
-            onClick={resetFilters}
-            className="btn btn-ghost btn-sm"
-            style={{ color: 'var(--status-red-text)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem' }}
-          >
-            <X size={14} /> Clear
-          </button>
-        )}
-      </div>
+      </ResponsiveFilterBar>
 
       {/* Data Table */}
       {loading ? (
@@ -499,3 +480,4 @@ export const OfficeMaintenance = ({ searchQuery, triggerExportModal, setToast })
     </div>
   );
 };
+

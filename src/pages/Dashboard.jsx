@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { store, subscribeStore } from '../lib/store.js';
 import {
   fetchGuests,
   fetchGHMaintenance,
@@ -12,448 +11,355 @@ import {
 } from '../lib/supabaseService.js';
 import { MaintenancePieChart } from '../components/charts/MaintenancePieChart.jsx';
 import { BillsBarChart } from '../components/charts/BillsBarChart.jsx';
-import { StatusBadge } from '../components/common/StatusBadge.jsx';
+import { ErrorBanner } from '../components/common/ErrorBanner.jsx';
+import {
+  CardSkeleton,
+  ChartSkeleton,
+  ActivityFeedSkeleton
+} from '../components/common/Loader.jsx';
+import { UserAvatar } from '../components/common/UserAvatar.jsx';
 import {
   UserCheck,
   Wrench,
-  Package,
   CreditCard,
   Barcode,
   ArrowRight,
   Activity,
   ChevronRight,
-  Users,
-  ClipboardList,
-  ShieldCheck
+  ChevronLeft
 } from 'lucide-react';
-import { TableLoader } from '../components/common/Loader.jsx';
 
+// ─── KPI Stat Card ─────────────────────────────────────────────────────────
+const StatCard = ({ label, value, subtext, icon: Icon, iconBg, iconColor, onClick }) => (
+  <div
+    onClick={onClick}
+    className="hover-card"
+    style={{
+      padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+      backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+      boxShadow: 'var(--shadow-sm)', cursor: 'pointer',
+      transition: 'var(--transition-fast)'
+    }}
+  >
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div>
+        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          {label}
+        </span>
+        <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem', lineHeight: 1 }}>
+          {value}
+        </h3>
+      </div>
+      <div style={{
+        width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
+        backgroundColor: iconBg, color: iconColor,
+        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+      }}>
+        <Icon size={22} />
+      </div>
+    </div>
+    <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+      {subtext} <ArrowRight size={12} />
+    </p>
+  </div>
+);
+
+// ─── Time formatter ─────────────────────────────────────────────────────────
+function formatTime(ts) {
+  if (!ts) return 'Just now';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 60000);
+  if (diff < 1) return 'Just now';
+  if (diff < 60) return `${diff}m ago`;
+  if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+// ─── Main Dashboard ─────────────────────────────────────────────────────────
 export const Dashboard = ({ setActivePage }) => {
   const { currentUser, hasModulePermission } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [data, setData] = useState({
-    users: store.getUsers(),
     guests: [],
     ghMaintenance: [],
-    ghInventory: [],
+    officeMaintenance: [],
     bills: [],
     officeAssets: [],
-    officeMaintenance: [],
     activityLogs: []
   });
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     setLoading(true);
+    setError(null);
+
     try {
       const [
         guestsRes,
         ghMaintRes,
-        ghInvRes,
+        officeMaintRes,
         billsRes,
         officeAssetsRes,
-        officeMaintRes,
         logsRes
       ] = await Promise.all([
         fetchGuests(),
         fetchGHMaintenance(),
-        fetchGHInventory(),
+        fetchOfficeMaintenance(),
         fetchBillPayments(),
         fetchOfficeAssets(),
-        fetchOfficeMaintenance(),
         fetchActivityLogs(20)
       ]);
 
+      // Check for critical errors (don't crash on partial failure)
+      const hasError = [guestsRes, ghMaintRes, officeMaintRes, billsRes, officeAssetsRes].some(r => r.error);
+      if (hasError) {
+        setError('Could not load some data from the server. Showing what was available.');
+      }
+
       setData({
-        users: store.getUsers(),
-        guests: guestsRes.data?.length ? guestsRes.data : store.getGuests(),
-        ghMaintenance: ghMaintRes.data?.length ? ghMaintRes.data : store.getGHMaintenance(),
-        ghInventory: ghInvRes.data?.length ? ghInvRes.data : store.getGHInventory(),
-        bills: billsRes.data?.length ? billsRes.data : store.getBillPayments(),
-        officeAssets: officeAssetsRes.data?.length ? officeAssetsRes.data : store.getOfficeAssets(),
-        officeMaintenance: officeMaintRes.data?.length ? officeMaintRes.data : store.getOfficeMaintenance(),
-        activityLogs: logsRes.data?.length ? logsRes.data : store.getActivityLogs()
+        guests: guestsRes.data || [],
+        ghMaintenance: ghMaintRes.data || [],
+        officeMaintenance: officeMaintRes.data || [],
+        bills: billsRes.data || [],
+        officeAssets: officeAssetsRes.data || [],
+        activityLogs: logsRes.data || []
       });
     } catch (err) {
-      console.warn('Supabase dashboard load failed, using local store:', err);
+      setError('Unable to reach the server. Please check your connection and try again.');
     }
+
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
 
-  // Compute Statistics per module
-  const totalGuestsCheckedIn = data.guests.length;
+  // ─── Computed stats ───────────────────────────────────────────────────────
+  const totalGuests = data.guests.length;
 
   const allMaintenance = [...data.ghMaintenance, ...data.officeMaintenance];
   const openMaintenanceCount = allMaintenance.filter(m => m.status === 'Open').length;
-  const inProgressMaintenanceCount = allMaintenance.filter(m => m.status === 'In Progress').length;
-  const resolvedMaintenanceCount = allMaintenance.filter(m => m.status === 'Resolved').length;
+  const inProgressCount = allMaintenance.filter(m => m.status === 'In Progress').length;
+  const resolvedCount = allMaintenance.filter(m => m.status === 'Resolved').length;
 
-  const totalInventoryCount = data.ghInventory.reduce((acc, item) => acc + (Number(item.qty) || 0), 0);
   const totalBillsAmount = data.bills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
   const totalAssetsCount = data.officeAssets.length;
-  const officeMaintenanceOpen = data.officeMaintenance.filter(m => m.status === 'Open').length;
 
-  const role = currentUser?.role || 'super_admin';
+  const role = currentUser?.role || 'staff';
 
-  // Filtered activity feed based on module access permissions
   const filteredActivityLogs = data.activityLogs.filter(log => {
     if (role === 'super_admin' || role === 'admin') return true;
     const key = (log.moduleName || '').toLowerCase().replace(/\s+/g, '_');
     return hasModulePermission(key);
   }).slice(0, 6);
 
+  // ─── KPI card configs ─────────────────────────────────────────────────────
+  const statCards = [
+    {
+      key: 'guest_list',
+      label: 'Checked-in Guests',
+      value: totalGuests,
+      subtext: 'Active stay allocations',
+      icon: UserCheck,
+      iconBg: 'var(--color-primary-light)',
+      iconColor: 'var(--color-primary)',
+      page: 'guest_list'
+    },
+    {
+      key: 'maintenance',
+      label: 'Open Maintenance',
+      value: openMaintenanceCount,
+      subtext: `${inProgressCount} in progress · ${resolvedCount} resolved`,
+      icon: Wrench,
+      iconBg: 'rgba(239,68,68,0.1)',
+      iconColor: '#EF4444',
+      page: 'gh_maintenance'
+    },
+    {
+      key: 'office_bills',
+      label: 'Total Disbursements',
+      value: `GHS ${totalBillsAmount.toLocaleString('en-GH', { maximumFractionDigits: 0 })}`,
+      subtext: `${data.bills.length} bill payments logged`,
+      icon: CreditCard,
+      iconBg: 'rgba(16,185,129,0.1)',
+      iconColor: '#10B981',
+      page: 'office_bills'
+    },
+    {
+      key: 'office_assets',
+      label: 'Registered Assets',
+      value: totalAssetsCount,
+      subtext: 'Barcode-tagged office items',
+      icon: Barcode,
+      iconBg: 'rgba(99,102,241,0.1)',
+      iconColor: '#6366F1',
+      page: 'office_assets'
+    }
+  ].filter(card => {
+    if (card.key === 'maintenance') return hasModulePermission('gh_maintenance') || hasModulePermission('office_maintenance');
+    return hasModulePermission(card.key);
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      
-      {/* Access-Based Module KPI Cards Grid */}
+
+      {/* Error Banner */}
+      {error && (
+        <ErrorBanner
+          type="warning"
+          title="Partial data loaded"
+          message={error}
+          onRetry={loadDashboardData}
+        />
+      )}
+
+      {/* ─── KPI Stats Grid ────────────────────────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-        
-        {/* 1. Guest List Stat Card */}
-        {hasModulePermission('guest_list') && (
-          <div
-            onClick={() => setActivePage('guest_list')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Checked-in Guests
-                </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : totalGuestsCheckedIn}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <UserCheck size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Active stay allocations <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
-
-        {/* 2. GH Maintenance Stat Card */}
-        {hasModulePermission('gh_maintenance') && (
-          <div
-            onClick={() => setActivePage('gh_maintenance')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  GH Maintenance
-                </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : data.ghMaintenance.filter(m => m.status === 'Open').length}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#EF4444',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <Wrench size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Open repair tickets <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
-
-        {/* 3. GH Inventory Stat Card */}
-        {hasModulePermission('gh_inventory') && (
-          <div
-            onClick={() => setActivePage('gh_inventory')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  GH Inventory
-                </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : totalInventoryCount}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <Package size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Total tracked units <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
-
-        {/* 4. Office Bills Stat Card */}
-        {hasModulePermission('office_bills') && (
-          <div
-            onClick={() => setActivePage('office_bills')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Total Bill Payments
-                </span>
-                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : `GHS ${totalBillsAmount.toLocaleString('en-US', { maximumFractionDigits: 0 })}`}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'rgba(16, 185, 129, 0.1)', color: '#10B981',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <CreditCard size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              {data.bills.length} disbursements logged <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
-
-        {/* 5. Office Assets Stat Card */}
-        {hasModulePermission('office_assets') && (
-          <div
-            onClick={() => setActivePage('office_assets')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Registered Assets
-                </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : totalAssetsCount}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'rgba(99, 102, 241, 0.1)', color: '#6366F1',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <Barcode size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Barcode tagged devices <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
-
-        {/* 6. Office Maintenance Stat Card */}
-        {hasModulePermission('office_maintenance') && (
-          <div
-            onClick={() => setActivePage('office_maintenance')}
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--bg-card)',
-              border: '1px solid var(--border-color)',
-              boxShadow: 'var(--shadow-sm)',
-              cursor: 'pointer',
-              transition: 'var(--transition-fast)'
-            }}
-            className="hover-card"
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                  Office Repairs
-                </span>
-                <h3 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                  {loading ? '...' : officeMaintenanceOpen}
-                </h3>
-              </div>
-              <div style={{
-                width: '42px', height: '42px', borderRadius: 'var(--radius-md)',
-                backgroundColor: 'rgba(236, 72, 153, 0.1)', color: '#EC4899',
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
-              }}>
-                <Wrench size={22} />
-              </div>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Facility & Generator tickets <ArrowRight size={12} />
-            </p>
-          </div>
-        )}
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
+          : statCards.map(card => (
+              <StatCard
+                key={card.key}
+                label={card.label}
+                value={card.value}
+                subtext={card.subtext}
+                icon={card.icon}
+                iconBg={card.iconBg}
+                iconColor={card.iconColor}
+                onClick={() => setActivePage(card.page)}
+              />
+            ))
+        }
       </div>
 
-      {/* Analytics Charts & Visual Summaries Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-        
-        {/* Visual Chart 1: Maintenance Status Breakdown */}
-        <div style={{
-          padding: '1.5rem',
-          borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
-          <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-            Overall Maintenance Ticket Status
-          </h4>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Aggregated work order status across Guest House and Central Office.
-          </p>
-          <MaintenancePieChart
-            openCount={openMaintenanceCount}
-            inProgressCount={inProgressMaintenanceCount}
-            resolvedCount={resolvedMaintenanceCount}
-          />
-        </div>
+      {/* ─── Main Content Grid (Left: Charts, Right: Recent Activity Card) ─── */}
+      <div className="dashboard-main-grid">
 
-        {/* Visual Chart 2: Recent Disbursements Bar Breakdown */}
-        <div style={{
-          padding: '1.5rem',
-          borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)'
-        }}>
-          <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-            Utility & Vendor Bill Disbursements
-          </h4>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-            Recent payments breakdown (GHS).
-          </p>
-          <BillsBarChart bills={data.bills} />
-        </div>
-      </div>
+        {/* Left Column: Analytics Charts */}
+        {(hasModulePermission('gh_maintenance') || hasModulePermission('office_bills')) && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
-      {/* Bottom Row: Recent Activity Log Feed & Quick Links */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem' }}>
-        
-        {/* Activity Trail Feed */}
+            {hasModulePermission('gh_maintenance') && (
+              <div style={{
+                padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                  Maintenance Ticket Status
+                </h4>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Combined GH &amp; Office work order breakdown.
+                </p>
+                {loading
+                  ? <ChartSkeleton height={240} />
+                  : (openMaintenanceCount + inProgressCount + resolvedCount === 0)
+                    ? (
+                      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
+                        <Wrench size={28} color="var(--border-color)" />
+                        <span>No maintenance records yet</span>
+                      </div>
+                    )
+                    : <MaintenancePieChart openCount={openMaintenanceCount} inProgressCount={inProgressCount} resolvedCount={resolvedCount} />
+                }
+              </div>
+            )}
+
+            {hasModulePermission('office_bills') && (
+              <div style={{
+                padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-sm)'
+              }}>
+                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                  Utility &amp; Vendor Bill Disbursements
+                </h4>
+                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+                  Recent payments breakdown (GHS).
+                </p>
+                {loading
+                  ? <ChartSkeleton height={240} />
+                  : data.bills.length === 0
+                    ? (
+                      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
+                        <CreditCard size={28} color="var(--border-color)" />
+                        <span>No bill payments recorded yet</span>
+                      </div>
+                    )
+                    : <BillsBarChart bills={data.bills} />
+                }
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Right Column: Recent Operational Activity Card */}
         <div style={{
-          padding: '1.5rem',
-          borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)'
+          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)',
+          display: 'flex', flexDirection: 'column',
+          height: '100%', minHeight: '520px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={18} color="var(--color-primary)" />
               <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                Recent Operational Activity
+                Recent Activity
               </h4>
             </div>
             {role !== 'staff' && (
               <button
                 className="btn btn-ghost btn-sm"
                 onClick={() => setActivePage('activity_log')}
-                style={{ fontSize: '0.8125rem', color: 'var(--color-primary)' }}
+                style={{ fontSize: '0.8125rem', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                View Full Audit Log <ChevronRight size={14} />
+                Full Audit <ChevronRight size={14} />
               </button>
             )}
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-            {filteredActivityLogs.length > 0 ? (
-              filteredActivityLogs.map(log => (
-                <div
-                  key={log.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.75rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'var(--bg-card-hover)',
-                    border: '1px solid var(--border-color)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <img
-                      src={log.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
-                      alt={log.userName}
-                      style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                    <div>
-                      <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                        {log.userName}
+          {loading
+            ? <ActivityFeedSkeleton rows={5} />
+            : filteredActivityLogs.length > 0
+              ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                  {filteredActivityLogs.map(log => (
+                    <div key={log.id} style={{
+                      display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem',
+                      padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border-color)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: 1, minWidth: '160px' }}>
+                        <UserAvatar name={log.userName} src={log.userAvatar} size={30} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-main)', display: 'block', wordBreak: 'break-word' }}>
+                            {log.userName}
+                          </span>
+                          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-word', marginTop: '2px', lineHeight: 1.35 }}>
+                            <span style={{ textTransform: 'lowercase' }}>{log.action}</span>{' '}
+                            <strong style={{ color: 'var(--text-main)' }}>{log.recordAffected}</strong>
+                            {' '}in {log.moduleName}
+                          </p>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', paddingTop: '2px' }}>
+                        {formatTime(log.timestamp)}
                       </span>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        {log.action} record in <strong style={{ color: 'var(--text-main)' }}>{log.moduleName}</strong>: {log.recordAffected}
-                      </p>
                     </div>
-                  </div>
-                  <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {log.timestamp ? new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                  </span>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
-                No recent activity logged.
-              </p>
-            )}
-          </div>
+              )
+              : (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <Activity size={32} color="var(--border-color)" style={{ marginBottom: '0.5rem' }} />
+                  <p style={{ fontSize: '0.8125rem' }}>No recent activity logged yet.</p>
+                </div>
+              )
+          }
         </div>
-
 
       </div>
     </div>

@@ -7,18 +7,19 @@
  */
 
 import { supabase } from './supabase.js';
+import { sanitizeInput, sanitizeFormData } from './securityUtils.js';
 
 // ─── Helper: log an activity ─────────────────────────────────────────────────
 async function logActivity(currentUser, action, moduleName, recordAffected, details = null) {
   if (!currentUser) return;
   await supabase.from('activity_logs').insert({
     user_id: currentUser.id,
-    user_name: currentUser.name,
+    user_name: sanitizeInput(currentUser.name),
     user_avatar: currentUser.avatar || null,
-    action,
-    module_name: moduleName,
-    record_affected: recordAffected,
-    details
+    action: sanitizeInput(action),
+    module_name: sanitizeInput(moduleName),
+    record_affected: sanitizeInput(recordAffected),
+    details: sanitizeFormData(details)
   });
 }
 

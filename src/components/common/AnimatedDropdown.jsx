@@ -18,11 +18,15 @@ export const AnimatedDropdown = ({ isOpen, onClose, children, style = {}, align 
   useEffect(() => {
     if (!isOpen) return;
     const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target) &&
+        ref.current.parentElement &&
+        !ref.current.parentElement.contains(e.target)
+      ) {
         onClose?.();
       }
     };
-    // tiny delay so the toggle click doesn't immediately close
     const t = setTimeout(() => document.addEventListener('mousedown', handleClick), 10);
     return () => {
       clearTimeout(t);

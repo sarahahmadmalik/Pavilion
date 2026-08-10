@@ -60,9 +60,10 @@ export const OfficeMaintenance = (props) => {
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchOfficeMaintenance();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchOfficeMaintenance(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -73,8 +74,8 @@ export const OfficeMaintenance = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Office Maintenance" />;
 
@@ -211,7 +212,7 @@ export const OfficeMaintenance = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Office Maintenance', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Office Maintenance', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

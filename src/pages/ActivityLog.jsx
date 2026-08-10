@@ -231,11 +231,12 @@ export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
     setLoadError(null);
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
     try {
-      const { data, error } = await fetchActivityLogs(200);
+      const { data, error } = await fetchActivityLogs(200, searchTerm);
       if (error) {
         setLoadError('Unable to load activity logs. Please try again.');
         setLogs([]);
@@ -249,7 +250,9 @@ export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (currentUser?.role === 'staff') {
     return <AccessDenied moduleName="System Audit Activity Logs" />;
@@ -287,13 +290,21 @@ export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
 
       {/* Page Header */}
-      <div>
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-          System Audit &amp; Activity Logs
-        </h2>
-        <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-          Full audit trail of all user actions across MTA Ghana.
-        </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            System Audit &amp; Activity Logs
+          </h2>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            Full audit trail of all user actions across MTA Ghana.
+          </p>
+        </div>
+        <button
+          className="btn btn-export"
+          onClick={() => triggerExportModal?.('Activity Audit Logs', filteredLogs, exportColumns, logs)}
+        >
+          <FileSpreadsheet size={16} /> Export
+        </button>
       </div>
 
       {/* Error Banner */}

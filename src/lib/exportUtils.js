@@ -20,9 +20,9 @@ export function exportToExcel(moduleTitle = 'Export', data = [], columns = null)
   if (!effectiveCols || effectiveCols.length === 0) {
     if (exportData.length > 0 && exportData[0] && typeof exportData[0] === 'object') {
       effectiveCols = Object.keys(exportData[0])
-        .filter(k => !['id', 'created_at', 'updated_at'].includes(k))
+        .filter(k => !['id', 'created_at', 'updated_at', 'createdAt', 'updatedAt'].includes(k))
         .map(k => ({
-          label: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+          label: k.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b\w/g, l => l.toUpperCase()),
           key: k
         }));
     } else {
@@ -58,7 +58,24 @@ export function exportToExcel(moduleTitle = 'Export', data = [], columns = null)
   XLSX.utils.book_append_sheet(wb, ws, sheetName);
 
   const filename = `MTA_Ghana_${(moduleTitle || 'Data').replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.xlsx`;
-  XLSX.writeFile(wb, filename);
+
+  try {
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (err) {
+    console.error('XLSX export fallback:', err);
+    XLSX.writeFile(wb, filename);
+  }
 
   return filename;
 }

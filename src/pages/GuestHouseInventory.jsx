@@ -55,9 +55,10 @@ export const GuestHouseInventory = (props) => {
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchGHInventory();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchGHInventory(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -68,8 +69,8 @@ export const GuestHouseInventory = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Guest House Inventory" />;
 
@@ -199,7 +200,7 @@ export const GuestHouseInventory = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Guest House Inventory', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Guest House Inventory', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

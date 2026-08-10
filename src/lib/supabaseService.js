@@ -237,11 +237,13 @@ export async function upsertUserPermissions(userId, moduleKey, perms) {
 }
 
 // ─── GUEST LIST ───────────────────────────────────────────────────────────────
-export async function fetchGuests() {
-  const { data, error } = await supabase
-    .from('guest_list')
-    .select('*')
-    .order('created_at', { ascending: false });
+export async function fetchGuests(searchQuery = '') {
+  let query = supabase.from('guest_list').select('*').order('created_at', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`name.ilike.%${t}%,country.ilike.%${t}%,room_allocated.ilike.%${t}%,purpose_of_stay.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_guest), error: normalizeError(error) };
 }
 
@@ -268,11 +270,13 @@ export async function deleteGuest(id, name, currentUser) {
 }
 
 // ─── GUEST HOUSE MAINTENANCE ──────────────────────────────────────────────────
-export async function fetchGHMaintenance() {
-  const { data, error } = await supabase
-    .from('guest_house_maintenance')
-    .select('*')
-    .order('reported_on', { ascending: false });
+export async function fetchGHMaintenance(searchQuery = '') {
+  let query = supabase.from('guest_house_maintenance').select('*').order('reported_on', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`issue.ilike.%${t}%,location.ilike.%${t}%,name_of_worker.ilike.%${t}%,updates.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_maintenance), error };
 }
 
@@ -299,11 +303,13 @@ export async function deleteGHMaintenance(id, issue, currentUser) {
 }
 
 // ─── GUEST HOUSE INVENTORY ────────────────────────────────────────────────────
-export async function fetchGHInventory() {
-  const { data, error } = await supabase
-    .from('guest_house_inventory')
-    .select('*')
-    .order('created_at', { ascending: false });
+export async function fetchGHInventory(searchQuery = '') {
+  let query = supabase.from('guest_house_inventory').select('*').order('created_at', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`item.ilike.%${t}%,location.ilike.%${t}%,notes.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_inventory), error: normalizeError(error) };
 }
 
@@ -328,11 +334,13 @@ export async function deleteGHInventory(id, item, currentUser) {
 }
 
 // ─── OFFICE BILL PAYMENTS ─────────────────────────────────────────────────────
-export async function fetchBillPayments() {
-  const { data, error } = await supabase
-    .from('office_bill_payments')
-    .select('*')
-    .order('date', { ascending: false });
+export async function fetchBillPayments(searchQuery = '') {
+  let query = supabase.from('office_bill_payments').select('*').order('date', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`company.ilike.%${t}%,cheque_no.ilike.%${t}%,payee.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_bill), error: normalizeError(error) };
 }
 
@@ -357,11 +365,13 @@ export async function deleteBillPayment(id, company, currentUser) {
 }
 
 // ─── OFFICE ASSETS ────────────────────────────────────────────────────────────
-export async function fetchOfficeAssets() {
-  const { data, error } = await supabase
-    .from('office_assets')
-    .select('*')
-    .order('created_at', { ascending: false });
+export async function fetchOfficeAssets(searchQuery = '') {
+  let query = supabase.from('office_assets').select('*').order('created_at', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`description.ilike.%${t}%,barcode.ilike.%${t}%,location.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_asset), error: normalizeError(error) };
 }
 
@@ -386,11 +396,13 @@ export async function deleteOfficeAsset(id, description, currentUser) {
 }
 
 // ─── OFFICE MAINTENANCE ───────────────────────────────────────────────────────
-export async function fetchOfficeMaintenance() {
-  const { data, error } = await supabase
-    .from('office_maintenance')
-    .select('*')
-    .order('reported_on', { ascending: false });
+export async function fetchOfficeMaintenance(searchQuery = '') {
+  let query = supabase.from('office_maintenance').select('*').order('reported_on', { ascending: false });
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`issue.ilike.%${t}%,location.ilike.%${t}%,name_of_worker.ilike.%${t}%,updates.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_maintenance), error };
 }
 
@@ -415,12 +427,13 @@ export async function deleteOfficeMaintenance(id, issue, currentUser) {
 }
 
 // ─── ACTIVITY LOGS ────────────────────────────────────────────────────────────
-export async function fetchActivityLogs(limit = 100) {
-  const { data, error } = await supabase
-    .from('activity_logs')
-    .select('*')
-    .order('timestamp', { ascending: false })
-    .limit(limit);
+export async function fetchActivityLogs(limit = 100, searchQuery = '') {
+  let query = supabase.from('activity_logs').select('*').order('timestamp', { ascending: false }).limit(limit);
+  if (searchQuery && searchQuery.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`user_name.ilike.%${t}%,module_name.ilike.%${t}%,record_affected.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
   return { data: (data || []).map(toJS_log), error: normalizeError(error) };
 }
 

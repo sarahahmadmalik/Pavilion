@@ -13,13 +13,18 @@ import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, Edit, Trash2, Key, Ban, Shield, Lock, Settings, X } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Key, Ban, Shield, Lock, Settings, X, FileSpreadsheet } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
+import { useLayout } from '../components/layout/Layout.jsx';
 
-export const UserManagement = ({ searchQuery, setToast }) => {
+export const UserManagement = (props) => {
+  const layoutContext = useLayout();
+  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
+  const searchQuery = props.searchQuery || layoutContext.searchQuery;
+  const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, refreshUsers } = useAuth();
   if (currentUser?.role !== 'super_admin') return <AccessDenied moduleName="User & Permission Management" />;
 
@@ -63,9 +68,10 @@ export const UserManagement = ({ searchQuery, setToast }) => {
     { key: 'office_maintenance', label: 'Office Maintenance' }
   ];
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchAllUsers();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchAllUsers(searchTerm);
     if (!error && Array.isArray(data)) {
       setUsers(data);
     } else {
@@ -76,8 +82,8 @@ export const UserManagement = ({ searchQuery, setToast }) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   const query = (searchQuery || localSearch).toLowerCase();
   const filteredUsers = users.filter(u => {
@@ -212,6 +218,13 @@ export const UserManagement = ({ searchQuery, setToast }) => {
     }
   };
 
+  const exportColumns = [
+    { label: 'Name', key: 'name' },
+    { label: 'Email', key: 'email' },
+    { label: 'Role', key: 'role' },
+    { label: 'Status', key: 'status' }
+  ];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
       
@@ -219,16 +232,24 @@ export const UserManagement = ({ searchQuery, setToast }) => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-            User Accounts & Permission Matrix
+            User Accounts &amp; Permission Matrix
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
             Provision administrative accounts, assign roles, configure module access levels.
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={handleOpenAdd}>
-          <Plus size={16} /> Create User Account
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button
+            className="btn btn-export"
+            onClick={() => triggerExportModal?.('User Accounts', filteredUsers, exportColumns, users)}
+          >
+            <FileSpreadsheet size={16} /> Export
+          </button>
+          <button className="btn btn-primary" onClick={handleOpenAdd}>
+            <Plus size={16} /> Create User Account
+          </button>
+        </div>
       </div>
 
       {/* Filter Bar */}

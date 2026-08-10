@@ -59,9 +59,10 @@ export const GuestList = (props) => {
   const [deletingId, setDeletingId] = useState(null);
   const [deletingName, setDeletingName] = useState('');
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchGuests();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchGuests(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -72,8 +73,8 @@ export const GuestList = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Guest List" />;
 
@@ -230,7 +231,7 @@ export const GuestList = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Guest List', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Guest List', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

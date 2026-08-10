@@ -55,9 +55,10 @@ export const OfficeBillPayments = (props) => {
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchBillPayments();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchBillPayments(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -68,8 +69,8 @@ export const OfficeBillPayments = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Office Bill Payments" />;
 
@@ -201,7 +202,7 @@ export const OfficeBillPayments = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Office Bill Payments', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Office Bill Payments', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

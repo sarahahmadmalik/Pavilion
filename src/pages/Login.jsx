@@ -185,8 +185,22 @@ export const Login = ({ onLoginSuccess }) => {
             </button>
           </div>
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', padding: '0.75rem', fontSize: '0.9375rem', fontWeight: 600 }}>
-            Log In to Dashboard
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem'
+            }}
+          >
+            {isSubmitting ? <Spinner size={18} color="#ffffff" /> : 'Login'}
           </button>
         </form>
 

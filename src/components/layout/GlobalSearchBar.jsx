@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, Users, Wrench, Package, CreditCard, Barcode, ArrowRight, ClipboardList } from 'lucide-react';
+import { Search, X, Users, Wrench, Package, CreditCard, Barcode, ArrowRight, ClipboardList, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase.js';
 
-// ─── Module config ────────────────────────────────────────────────────────────
+// ─── Comprehensive Module configuration ──────────────────────────────────────
 const MODULES = [
   {
     key: 'guest_list',
@@ -22,9 +22,9 @@ const MODULES = [
     icon: <Wrench size={14} />,
     color: '#D97706',
     bg: 'rgba(245,158,11,0.1)',
-    fields: ['issue', 'location', 'name_of_worker', 'status'],
+    fields: ['issue', 'location', 'name_of_worker', 'updates'],
     displayField: 'issue',
-    subtitleFields: ['location', 'status'],
+    subtitleFields: ['location', 'name_of_worker', 'status'],
   },
   {
     key: 'gh_inventory',
@@ -33,9 +33,9 @@ const MODULES = [
     icon: <Package size={14} />,
     color: '#7C3AED',
     bg: 'rgba(139,92,246,0.1)',
-    fields: ['item_description', 'location'],
-    displayField: 'item_description',
-    subtitleFields: ['location'],
+    fields: ['item', 'location', 'notes'],
+    displayField: 'item',
+    subtitleFields: ['location', 'condition'],
   },
   {
     key: 'office_bills',
@@ -46,7 +46,7 @@ const MODULES = [
     bg: 'rgba(16,185,129,0.1)',
     fields: ['company', 'payee', 'cheque_no'],
     displayField: 'company',
-    subtitleFields: ['payee'],
+    subtitleFields: ['payee', 'cheque_no'],
   },
   {
     key: 'office_assets',
@@ -55,9 +55,9 @@ const MODULES = [
     icon: <Barcode size={14} />,
     color: '#DB2777',
     bg: 'rgba(236,72,153,0.1)',
-    fields: ['description', 'location', 'assigned_to'],
+    fields: ['description', 'location', 'barcode'],
     displayField: 'description',
-    subtitleFields: ['location', 'assigned_to'],
+    subtitleFields: ['location', 'barcode', 'status'],
   },
   {
     key: 'office_maintenance',
@@ -66,10 +66,32 @@ const MODULES = [
     icon: <Wrench size={14} />,
     color: '#0891B2',
     bg: 'rgba(6,182,212,0.1)',
-    fields: ['issue', 'location', 'status'],
+    fields: ['issue', 'location', 'updates', 'name_of_worker'],
     displayField: 'issue',
-    subtitleFields: ['location', 'status'],
+    subtitleFields: ['location', 'name_of_worker', 'status'],
   },
+  {
+    key: 'user_management',
+    label: 'User Accounts',
+    table: 'users',
+    icon: <Shield size={14} />,
+    color: '#4F46E5',
+    bg: 'rgba(79,70,229,0.1)',
+    fields: ['name', 'email'],
+    displayField: 'name',
+    subtitleFields: ['email', 'role', 'status'],
+  },
+  {
+    key: 'activity_log',
+    label: 'Activity Audit Logs',
+    table: 'activity_logs',
+    icon: <ClipboardList size={14} />,
+    color: '#64748B',
+    bg: 'rgba(100,116,139,0.1)',
+    fields: ['user_name', 'module_name', 'record_affected'],
+    displayField: 'record_affected',
+    subtitleFields: ['user_name', 'action', 'module_name'],
+  }
 ];
 
 // ─── Highlight matching text ──────────────────────────────────────────────────
@@ -91,9 +113,9 @@ function Highlight({ text, query }) {
   );
 }
 
-// ─── Main Search Bar ──────────────────────────────────────────────────────────
+// ─── Main Search Bar Component ────────────────────────────────────────────────
 export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) => {
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState(searchQuery || '');
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
@@ -103,7 +125,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Close on outside click
+  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
@@ -114,12 +136,11 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Debounced search
+  // Comprehensive parallel search across all database tables
   const doSearch = useCallback(async (q) => {
-    if (!q || q.trim().length < 2) {
+    if (!q || !q.trim()) {
       setResults([]);
       setIsOpen(false);
-      setSearchQuery('');
       return;
     }
     setIsSearching(true);
@@ -130,13 +151,12 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     await Promise.all(
       MODULES.map(async (mod) => {
         try {
-          // Build OR filter across text fields
           const orFilter = mod.fields.map(f => `${f}.ilike.%${term}%`).join(',');
           const { data } = await supabase
             .from(mod.table)
             .select('*')
             .or(orFilter)
-            .limit(4);
+            .limit(5);
 
           if (data && data.length > 0) {
             data.forEach(row => {
@@ -151,19 +171,20 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
                 module: mod,
                 title: displayVal,
                 subtitle: subtitles,
+                rawRow: row
               });
             });
           }
         } catch (e) {
-          // Silently skip modules with search errors
+          // Ignore table query errors gracefully
         }
       })
     );
 
-    setResults(allResults.slice(0, 12)); // cap at 12 total
+    setResults(allResults.slice(0, 16)); // cap at 16 top matches
     setIsOpen(true);
     setIsSearching(false);
-  }, [setSearchQuery]);
+  }, []);
 
   const handleInputChange = (e) => {
     const val = e.target.value;
@@ -173,30 +194,31 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       doSearch(val);
-    }, 280);
+    }, 200);
   };
 
   const handleSelect = (result) => {
-    setInputValue('');
-    setSearchQuery('');
+    const filterTerm = result.title;
+    setInputValue(filterTerm);
+    setSearchQuery?.(filterTerm);
     setResults([]);
     setIsOpen(false);
-    setActivePage(result.module.key);
+    if (result.module?.key) {
+      setActivePage(result.module.key);
+    }
   };
 
   const handleClear = () => {
     setInputValue('');
-    setSearchQuery('');
     setResults([]);
     setIsOpen(false);
     inputRef.current?.focus();
   };
 
-  // Propagate to page-level search after a short delay
   const handleKeyDown = (e) => {
-    if (!isOpen) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
+      if (!isOpen && results.length > 0) setIsOpen(true);
       setActiveIndex(i => Math.min(i + 1, results.length - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -204,9 +226,11 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     } else if (e.key === 'Enter') {
       if (activeIndex >= 0 && results[activeIndex]) {
         handleSelect(results[activeIndex]);
+      } else if (results.length > 0) {
+        // Top match fallback
+        handleSelect(results[0]);
       } else if (inputValue.trim()) {
-        // Fall back to in-page search
-        setSearchQuery(inputValue.trim());
+        setSearchQuery?.(inputValue.trim());
         setIsOpen(false);
       }
     } else if (e.key === 'Escape') {
@@ -214,7 +238,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     }
   };
 
-  // Group results by module
+  // Group search results by module
   const grouped = {};
   results.forEach(r => {
     const label = r.module.label;
@@ -223,8 +247,8 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
   });
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', maxWidth: '340px' }}>
-      {/* Input */}
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
+      {/* Search Input Box */}
       <div style={{ position: 'relative' }}>
         <Search
           size={15}
@@ -235,12 +259,15 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
           ref={inputRef}
           type="text"
           className="input-control"
-          placeholder="Search guests, assets, bills…"
+          placeholder="Search all guests, assets, bills, users…"
           value={inputValue}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
           onFocus={() => {
-            if (results.length > 0) setIsOpen(true);
+            if (inputValue.trim()) {
+              if (results.length > 0) setIsOpen(true);
+              else doSearch(inputValue);
+            }
           }}
           style={{ paddingLeft: '2.125rem', paddingRight: inputValue ? '2rem' : '0.75rem', fontSize: '0.8125rem' }}
           autoComplete="off"
@@ -253,13 +280,14 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
               background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)',
               display: 'flex', alignItems: 'center', padding: '2px'
             }}
+            title="Clear search"
           >
             <X size={14} />
           </button>
         )}
       </div>
 
-      {/* Dropdown */}
+      {/* Global Live Results Dropdown */}
       {isOpen && (
         <div style={{
           position: 'absolute',
@@ -269,63 +297,63 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
           backgroundColor: 'var(--bg-card)',
           border: '1px solid var(--border-color)',
           borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 16px 48px rgba(0,0,0,0.18)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.22)',
           zIndex: 9999,
-          maxHeight: '420px',
+          maxHeight: '440px',
           overflowY: 'auto',
           animation: 'fadeIn 0.12s ease-out'
         }}>
           {isSearching ? (
             <div style={{ padding: '1.25rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
-              Searching…
+              Searching across all database tables…
             </div>
           ) : results.length === 0 ? (
             <div style={{ padding: '1.5rem', textAlign: 'center' }}>
-              <Search size={24} color="var(--text-muted)" style={{ marginBottom: '0.5rem' }} />
+              <Search size={22} color="var(--text-muted)" style={{ marginBottom: '0.5rem' }} />
               <p style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
-                No results found
+                No records found matching "{inputValue}"
               </p>
               <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                Try different keywords or check spelling.
+                Try searching for guest names, asset tags, bill companies, or usernames.
               </p>
             </div>
           ) : (
             <>
               {Object.entries(grouped).map(([label, group]) => (
                 <div key={label}>
-                  {/* Group header */}
+                  {/* Category Header */}
                   <div style={{
                     padding: '0.5rem 0.875rem 0.25rem',
                     display: 'flex', alignItems: 'center', gap: '0.375rem',
-                    borderTop: '1px solid var(--border-color)',
-                    marginTop: Object.keys(grouped)[0] === label ? 0 : 0
+                    borderTop: '1px solid var(--border-color)'
                   }}>
                     <span style={{
                       fontSize: '0.6875rem', fontWeight: 700, color: group.mod.color,
                       textTransform: 'uppercase', letterSpacing: '0.06em',
                       backgroundColor: group.mod.bg, padding: '2px 6px', borderRadius: '999px',
-                      display: 'flex', alignItems: 'center', gap: '3px'
+                      display: 'flex', alignItems: 'center', gap: '4px'
                     }}>
                       {group.mod.icon} {label}
                     </span>
                   </div>
 
-                  {/* Results */}
-                  {group.items.map((result, resultIdx) => {
+                  {/* Result Items */}
+                  {group.items.map((result) => {
                     const globalIdx = results.indexOf(result);
+                    const isSelected = activeIndex === globalIdx;
                     return (
                       <button
-                        key={result.id}
+                        key={`${result.module.key}-${result.id}`}
                         onClick={() => handleSelect(result)}
                         style={{
                           width: '100%', display: 'flex', alignItems: 'center', gap: '0.625rem',
                           padding: '0.625rem 0.875rem',
-                          border: 'none', background: activeIndex === globalIdx ? 'var(--color-primary-light)' : 'none',
+                          border: 'none', background: isSelected ? 'var(--color-primary-light)' : 'none',
                           cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                           transition: 'background 0.1s ease'
                         }}
                         onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.backgroundColor = activeIndex === globalIdx ? 'var(--color-primary-light)' : 'transparent'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = isSelected ? 'var(--color-primary-light)' : 'transparent'}
                       >
                         <div style={{
                           width: '30px', height: '30px', borderRadius: 'var(--radius-sm)', flexShrink: 0,
@@ -340,7 +368,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
                           </p>
                           {result.subtitle && (
                             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {result.subtitle}
+                              <Highlight text={result.subtitle} query={inputValue} />
                             </p>
                           )}
                         </div>
@@ -351,7 +379,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
                 </div>
               ))}
 
-              {/* Footer tip */}
+              {/* Keyboard tip footer */}
               <div style={{
                 padding: '0.5rem 0.875rem', borderTop: '1px solid var(--border-color)',
                 display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -361,7 +389,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
                   padding: '1px 5px', borderRadius: '3px', fontSize: '0.625rem',
                   border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-input)', color: 'var(--text-muted)'
                 }}>↵</kbd>
-                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>to navigate · Click to go to module</span>
+                <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Press Enter to view record module</span>
               </div>
             </>
           )}

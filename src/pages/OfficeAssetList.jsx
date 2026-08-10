@@ -56,9 +56,10 @@ export const OfficeAssetList = (props) => {
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchOfficeAssets();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchOfficeAssets(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -69,8 +70,8 @@ export const OfficeAssetList = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Office Asset List" />;
 
@@ -191,7 +192,7 @@ export const OfficeAssetList = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Office Asset List', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Office Asset List', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

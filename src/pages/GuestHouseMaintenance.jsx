@@ -60,9 +60,10 @@ export const GuestHouseMaintenance = (props) => {
   // Confirm Delete State
   const [deletingId, setDeletingId] = useState(null);
 
-  const loadData = async () => {
+  const loadData = async (q) => {
     setLoading(true);
-    const { data, error } = await fetchGHMaintenance();
+    const searchTerm = q !== undefined ? q : (searchQuery || localSearch);
+    const { data, error } = await fetchGHMaintenance(searchTerm);
     if (!error && Array.isArray(data)) {
       setItems(data);
     } else {
@@ -73,8 +74,8 @@ export const GuestHouseMaintenance = (props) => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(searchQuery || localSearch);
+  }, [searchQuery, localSearch]);
 
   if (!canView) return <AccessDenied moduleName="Guest House Maintenance" />;
 
@@ -211,7 +212,7 @@ export const GuestHouseMaintenance = (props) => {
           )}
           <button
             className="btn btn-export"
-            onClick={() => triggerExportModal?.('Guest House Maintenance', filteredItems, exportColumns)}
+            onClick={() => triggerExportModal?.('Guest House Maintenance', filteredItems, exportColumns, items)}
           >
             <FileSpreadsheet size={16} /> Export
           </button>

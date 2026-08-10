@@ -160,10 +160,27 @@ export const Layout = ({ activePage, setActivePage, children }) => {
     setExportState({ isOpen: true, moduleTitle, data: fullData, columns, filteredData: filtData, hasActiveFilters });
   };
 
-  const handleConfirmExport = ({ scope }) => {
-    const exportedData = scope === 'filtered'
-      ? exportState.filteredData
-      : exportState.data;
+  const handleConfirmExport = async ({ scope }) => {
+    let exportedData = [];
+    if (scope === 'filtered') {
+      exportedData = exportState.filteredData;
+    } else {
+      const moduleTitle = exportState.moduleTitle;
+      let res = { data: exportState.data };
+      try {
+        if (moduleTitle.includes('Guest List')) res = await fetchGuests('');
+        else if (moduleTitle.includes('GH Maintenance') || moduleTitle.includes('Guest House Maintenance')) res = await fetchGHMaintenance('');
+        else if (moduleTitle.includes('GH Inventory') || moduleTitle.includes('Guest House Inventory')) res = await fetchGHInventory('');
+        else if (moduleTitle.includes('Office Bill') || moduleTitle.includes('Office Bills')) res = await fetchBillPayments('');
+        else if (moduleTitle.includes('Office Asset') || moduleTitle.includes('Office Assets')) res = await fetchOfficeAssets('');
+        else if (moduleTitle.includes('Office Maintenance')) res = await fetchOfficeMaintenance('');
+        else if (moduleTitle.includes('User')) res = await fetchAllUsers('');
+        else if (moduleTitle.includes('Activity') || moduleTitle.includes('Audit')) res = await fetchActivityLogs(5000, '');
+      } catch (err) {
+        console.error('Error fetching full dataset for export:', err);
+      }
+      exportedData = (res.data && Array.isArray(res.data) && res.data.length > 0) ? res.data : exportState.data;
+    }
     const filename = exportToExcel(exportState.moduleTitle, exportedData, exportState.columns);
     setToast({ type: 'success', message: `✓ ${filename} downloaded.` });
   };

@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 
 /**
  * Per-module Google Sheets URL memory (in-memory per session).
@@ -7,7 +7,12 @@ import * as XLSX from 'xlsx';
 const sheetLinks = {};
 
 /**
- * Exports data as a .xlsx file (proper Excel format, not CSV).
+ * Exports data as a beautifully formatted .xlsx file with:
+ * - Bold headers in navy background (#1A3FA0) with white text & borders
+ * - Full grid cell borders on all 4 sides of every cell
+ * - Padded row heights & zebra striping
+ * - Auto column widths
+ *
  * @param {string} moduleTitle - e.g. "Guest List"
  * @param {Array<object>} data - array of records
  * @param {Array<{label:string, key:string}>} [columns] - column definitions
@@ -34,7 +39,7 @@ export function exportToExcel(moduleTitle = 'Export', data = [], columns = null)
     }
   }
 
-  // Build worksheet rows
+  // Build worksheet data
   const headers = effectiveCols.map(c => c.label || c.key);
   const rows = exportData.map(row =>
     effectiveCols.map(c => {
@@ -47,11 +52,69 @@ export function exportToExcel(moduleTitle = 'Export', data = [], columns = null)
   const wsData = [headers, ...rows];
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  // Style header row bold (col widths)
-  const colWidths = effectiveCols.map(c => ({
-    wch: Math.max((c.label || c.key).length + 4, 18)
+  // Style definitions
+  const headerStyle = {
+    font: { name: 'Segoe UI', sz: 11, bold: true, color: { rgb: 'FFFFFF' } },
+    fill: { fgColor: { rgb: '1A3FA0' } }, // MTA Navy Blue
+    alignment: { vertical: 'center', horizontal: 'center', wrapText: true },
+    border: {
+      top: { style: 'thin', color: { rgb: '999999' } },
+      bottom: { style: 'medium', color: { rgb: '1A3FA0' } },
+      left: { style: 'thin', color: { rgb: '999999' } },
+      right: { style: 'thin', color: { rgb: '999999' } }
+    }
+  };
+
+  const borderThin = {
+    top: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    left: { style: 'thin', color: { rgb: 'D1D5DB' } },
+    right: { style: 'thin', color: { rgb: 'D1D5DB' } }
+  };
+
+  const rowStyleEven = {
+    font: { name: 'Segoe UI', sz: 10, color: { rgb: '111827' } },
+    fill: { fgColor: { rgb: 'FFFFFF' } },
+    alignment: { vertical: 'center' },
+    border: borderThin
+  };
+
+  const rowStyleOdd = {
+    font: { name: 'Segoe UI', sz: 10, color: { rgb: '111827' } },
+    fill: { fgColor: { rgb: 'F8FAFC' } }, // Slate 50 zebra stripe
+    alignment: { vertical: 'center' },
+    border: borderThin
+  };
+
+  // Apply Styles & calculate column widths
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1');
+  const colMaxLengths = new Array(effectiveCols.length).fill(0);
+
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[cellRef]) ws[cellRef] = { v: '', t: 's' };
+
+      const cellVal = String(ws[cellRef].v || '');
+      colMaxLengths[C] = Math.max(colMaxLengths[C] || 0, cellVal.length);
+
+      if (R === 0) {
+        ws[cellRef].s = headerStyle;
+      } else {
+        ws[cellRef].s = (R % 2 === 0) ? rowStyleEven : rowStyleOdd;
+      }
+    }
+  }
+
+  // Set Row Heights & Column Widths
+  ws['!rows'] = [{ hpt: 28 }]; // Header row height 28pt
+  for (let r = 1; r <= range.e.r; r++) {
+    ws['!rows'].push({ hpt: 22 }); // Data rows height 22pt
+  }
+
+  ws['!cols'] = effectiveCols.map((c, idx) => ({
+    wch: Math.max((c.label || c.key).length + 4, colMaxLengths[idx] + 4, 18)
   }));
-  ws['!cols'] = colWidths;
 
   const wb = XLSX.utils.book_new();
   const sheetName = (moduleTitle || 'Data').slice(0, 31);

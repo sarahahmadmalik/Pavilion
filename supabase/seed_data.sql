@@ -217,7 +217,20 @@ INSERT INTO public.guest_list (name, check_in, check_out, country, room_allocate
 ('Zubair Hassan', '2026-07-28', '2026-08-05', 'Pakistan', 'Room 202', 'Regional MTA Africa Delegation'),
 ('Faisal Saeed', '2026-08-02', '2026-08-12', 'Pakistan', 'VIP Suite 102', 'Documentation & Media Production'),
 ('Ahsan Raza', '2026-08-05', '2026-08-15', 'Pakistan', 'VIP Suite 103', 'Medical Outreach Consultation'),
-('Danish Iqbal', '2026-08-06', '2026-08-09', 'Pakistan', 'Room 201', 'Broadcasting Engineering Review');
+('Danish Iqbal', '2026-08-06', '2026-08-09', 'Pakistan', 'Room 201', 'Broadcasting Engineering Review'),
+('Tariq Mehmood', '2026-07-20', '2026-07-30', 'Pakistan', 'Room 103', 'IT Infrastructure Upgrade'),
+('Rashid Minhas', '2026-07-22', '2026-08-02', 'Pakistan', 'Room 108', 'Satellite Uplink Maintenance'),
+('Shahid Afridi', '2026-07-25', '2026-08-05', 'Pakistan', 'VIP Suite 104', 'Youth & Cultural Program Delegation'),
+('Imran Nazir', '2026-07-27', '2026-08-06', 'Pakistan', 'Room 206', 'Audio Engineering Workshop'),
+('Kamran Akmal', '2026-08-01', '2026-08-11', 'Pakistan', 'Room 208', 'Security Audit & Safety Assessment'),
+('Shoaib Malik', '2026-08-03', '2026-08-14', 'Pakistan', 'VIP Suite 105', 'Humanitarian Relief Planning'),
+('Younis Khan', '2026-08-05', '2026-08-16', 'Pakistan', 'VIP Suite 106', 'Regional Administrative Summit'),
+('Saeed Anwar', '2026-08-07', '2026-08-18', 'Pakistan', 'Room 102', 'Educational Curriculum Development'),
+('Inzamam ul Haq', '2026-08-08', '2026-08-20', 'Pakistan', 'VIP Suite 107', 'Interfaith Harmony Conference'),
+('Waqar Younis', '2026-08-09', '2026-08-21', 'Pakistan', 'Room 107', 'Transmission Tower Inspection'),
+('Wasim Akram', '2026-08-10', '2026-08-22', 'Pakistan', 'VIP Suite 108', 'Press & Media Relations'),
+('Abdul Razzaq', '2026-08-11', '2026-08-24', 'Pakistan', 'Room 209', 'Solar Power Installation Oversight'),
+('Azhar Mahmood', '2026-08-12', '2026-08-25', 'Pakistan', 'Room 210', 'Financial Audit & Accounts Review');
 
 -- Guest House Maintenance
 INSERT INTO public.guest_house_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES
@@ -225,7 +238,20 @@ INSERT INTO public.guest_house_maintenance (reported_on, issue, status, updates,
 ('2026-08-01', 'Water heater thermostat fault in Room 204', 'Resolved', 'Replaced 2000W heating element.', 'Room 204', 'Adnan Siddiqui (Plumber)', 320.00),
 ('2026-08-03', 'Master bathroom door lock latch stuck', 'Open', NULL, 'Room 105', 'Unassigned', 0.00),
 ('2026-07-29', 'Ceiling fan speed regulator replacement', 'Resolved', 'Replaced with 5-speed heavy-duty regulator.', 'Linen Closet / Reception', 'Waqas Butt', 180.00),
-('2026-08-04', 'VIP Lounge Smart TV HDMI port loose connection', 'Open', NULL, 'VIP Main Lounge', 'Unassigned', 0.00);
+('2026-08-04', 'VIP Lounge Smart TV HDMI port loose connection', 'Open', NULL, 'VIP Main Lounge', 'Unassigned', 0.00),
+('2026-08-05', 'Air condition leakage', 'In Progress', 'Draining condensate tray and re-sealing pipe', 'VIP Suite 103', 'Kamran Shah', 250.00),
+('2026-07-20', 'Balcony sliding door glass sealing gap', 'Resolved', 'Applied weather-resistant silicone seal', 'Room 202', 'Tariq Aluminum Works', 150.00),
+('2026-07-22', 'Shower head low pressure / mineral blockage', 'Resolved', 'Descaled and cleared nozzle jets', 'Room 103', 'Adnan Siddiqui', 90.00),
+('2026-07-25', 'Bedside reading lamp socket wiring trip', 'Resolved', 'Rewired lamp switch and replaced MCB fuse', 'VIP Suite 104', 'Nabeel Electricals', 120.00),
+('2026-07-27', 'Guest house dining table chair leg wobble', 'Resolved', 'Tightened wood joints and epoxy re-fill', 'Dining Hall', 'Farooq Carpentry', 80.00),
+('2026-07-28', 'Refrigerant gas recharge for Kitchen Fridge', 'Resolved', 'Recharged R134a refrigerant', 'Kitchen', 'Kamran Shah', 350.00),
+('2026-07-30', 'Exhaust fan noise in Room 206 restroom', 'Resolved', 'Oiled bearings and aligned fan blades', 'Room 206', 'Waqas Butt', 100.00),
+('2026-08-06', 'Corridor emergency lighting battery backup fail', 'Open', 'Replacement 12V 7Ah lead acid batteries ordered', 'Block A Hallway', 'Unassigned', 0.00),
+('2026-08-07', 'Curtain rail bracket dislodged', 'Open', NULL, 'Room 208', 'Unassigned', 0.00),
+('2026-08-08', 'Water pump pressure switch auto-start fault', 'In Progress', 'Inspecting pressure tank diaphragm', 'Pumphouse Yard', 'Adnan Siddiqui', 500.00),
+('2026-08-09', 'Keycard door sensor battery low indicator', 'Resolved', 'Replaced 4x AA Lithium batteries', 'VIP Suite 105', 'IT Lock Team', 40.00),
+('2026-08-10', 'Window flyscreen netting tear', 'Open', NULL, 'Room 209', 'Unassigned', 0.00),
+('2026-08-10', 'Intercom telephone line static noise', 'In Progress', 'Checking RJ11 cable connection', 'Reception Desk', 'IT Comms Team', 60.00);
 
 -- Guest House Inventory
 INSERT INTO public.guest_house_inventory (item, qty, condition, location, notes) VALUES
@@ -234,7 +260,21 @@ INSERT INTO public.guest_house_inventory (item, qty, condition, location, notes)
 ('Daikin 2.0 HP Inverter AC Units', 18, 'Fair', 'Guest Rooms Block A & B', 'Serviced quarterly'),
 ('Phillips HD LED Televisions (55 inch)', 8, 'Good', 'VIP Suites & Main Lounge', 'Connected to MTA Satellite'),
 ('Bath Towels Set (White Extra Large)', 40, 'Fair', 'Laundry Storage Closet', '8 sets flagged for replacement'),
-('Electric Kettles (Stainless Steel)', 14, 'Good', 'All Guest Suites', 'Checked during check-in protocol');
+('Electric Kettles (Stainless Steel)', 14, 'Good', 'All Guest Suites', 'Checked during check-in protocol'),
+('Mini Refrigerators (90L Silent)', 12, 'Good', 'VIP Suites', 'Energy Star certified'),
+('Steam Irons & Ironing Boards', 10, 'Good', 'Laundry Room / On Demand', 'Heavy duty Tefal irons'),
+('Hair Dryers (Ionic 2000W)', 12, 'Good', 'VIP Bathrooms', 'Wall mounted'),
+('Electronic Room Safes', 10, 'Good', 'VIP Suites', 'Digital keypad lock'),
+('Microwave Ovens (Digital 25L)', 4, 'Good', 'Dining Hall & Staff Pantry', 'Samsung Smart Inverter'),
+('Teak Dining Chairs with Cushion', 32, 'Good', 'Dining Hall', 'Polished hardwood finish'),
+('Executive Mahogany Study Desks', 14, 'Good', 'Guest Rooms', 'Built-in cable grommets'),
+('Blackout Velvet Window Curtains', 28, 'Good', 'Guest Room Windows', 'Fire retardant fabric'),
+('Porcelain Dinnerware Set (64-piece)', 4, 'Good', 'Kitchen Store', 'Royal Doulton pattern'),
+('Stainless Steel Cutlery Set (120-piece)', 3, 'Good', 'Kitchen Store', 'High-grade 18/10 steel'),
+('Commercial Coffee Espresso Machine', 1, 'Good', 'Reception Lounge Bar', 'DeLonghi Dual Pump'),
+('First Aid Medical Kits (Wall Mounted)', 6, 'Good', 'Reception, Kitchen, Corridor', 'Fully stocked emergency kit'),
+('Fire Extinguishers (CO2 5kg)', 10, 'Good', 'Hallways & Kitchen', 'Inspected July 2026'),
+('Luggage Racks (Folding Metallic)', 16, 'Good', 'All Bedrooms', 'Heavy duty steel frame');
 
 -- Office Bill Payments
 INSERT INTO public.office_bill_payments (date, company, cheque_no, payee, amount) VALUES
@@ -242,7 +282,20 @@ INSERT INTO public.office_bill_payments (date, company, cheque_no, payee, amount
 ('2026-08-02', 'Ghana Water Company Limited', 'CHK-2026-0892', 'GWCL Metered Service Division', 1280.00),
 ('2026-07-31', 'MTN Ghana Fibre Broadband', 'CHK-2026-0893', 'MTN Enterprise Business Unit', 2150.00),
 ('2026-07-25', 'State Insurance Corporation (SIC)', 'CHK-2026-0894', 'SIC Fixed Property Insurance', 4800.00),
-('2026-07-20', 'Perkins Generator Diesel Supply (GOIL)', 'CHK-2026-0895', 'GOIL Ghana Bulk Supply', 5600.00);
+('2026-07-20', 'Perkins Generator Diesel Supply (GOIL)', 'CHK-2026-0895', 'GOIL Ghana Bulk Supply', 5600.00),
+('2026-07-15', 'Vodafone Ghana Landline & SIP Trunk', 'CHK-2026-0896', 'Vodafone Enterprise Comms', 980.00),
+('2026-07-10', 'Accra Metropolitan Assembly (AMA Property Tax)', 'CHK-2026-0897', 'AMA Revenue Collector', 3200.00),
+('2026-07-05', 'CleanWave Environmental Waste Management', 'CHK-2026-0898', 'CleanWave Ghana Ltd', 650.00),
+('2026-07-01', 'TotalEnergies Fleet Fuel Cards', 'CHK-2026-0899', 'TotalEnergies Ghana HQ', 4100.00),
+('2026-06-28', 'Pest Control Services Ghana', 'CHK-2026-0900', 'Fumigation & Pest Specialist', 750.00),
+('2026-06-25', 'Elevator Maintenance Contract (Otis Ghana)', 'CHK-2026-0901', 'Otis Elevator Company Services', 2400.00),
+('2026-06-20', 'Security Guard Services (G4S Ghana)', 'CHK-2026-0902', 'G4S Security Solutions', 6800.00),
+('2026-06-15', 'Office Stationary & Paper Supplies (Papyrus Ltd)', 'CHK-2026-0903', 'Papyrus Stationers Accra', 1450.00),
+('2026-06-10', 'Air Conditioning Maintenance Contract', 'CHK-2026-0904', 'CoolTech HVAC Solutions', 1900.00),
+('2026-06-05', 'Janitorial & Cleaning Supplies (Hygiene First)', 'CHK-2026-0905', 'Hygiene First Distributors', 890.00),
+('2026-05-30', 'Fire Safety Systems Inspection Fee', 'CHK-2026-0906', 'Ghana National Fire Service', 500.00),
+('2026-05-25', 'Domain & Cloud Hosting Renewal', 'CHK-2026-0907', 'Web4Africa Hosting Division', 1120.00),
+('2026-05-20', 'CCTV Surveillance Cloud Backup License', 'CHK-2026-0908', 'Hikvision Authorized Vendor', 1650.00);
 
 -- Office Assets
 INSERT INTO public.office_assets (barcode, description, status, location) VALUES
@@ -252,14 +305,41 @@ INSERT INTO public.office_assets (barcode, description, status, location) VALUES
 ('MTA-AST-90217', 'Cisco Catalyst 9300 48-Port Managed Switch', 'In Use', 'Server Room Rack 01'),
 ('MTA-AST-90218', 'Apple Mac Studio M2 Max Video Editing Suite', 'In Use', 'Post-Production Room 02'),
 ('MTA-AST-90219', 'Yamaha TF5 32-Channel Digital Mixing Console', 'In Storage', 'Equipment Reserve Vault'),
-('MTA-AST-90220', 'APC Smart-UPS RT 10,000VA 230V Online Battery', 'In Use', 'Main Generator & Power Room');
+('MTA-AST-90220', 'APC Smart-UPS RT 10,000VA 230V Online Battery', 'In Use', 'Main Generator & Power Room'),
+('MTA-AST-90221', 'Canon XA70 Professional UHD 4K Camcorder', 'In Use', 'OB Van Unit 01'),
+('MTA-AST-90222', 'Sennheiser EW-100 G4 Wireless Mic System', 'In Use', 'Studio B Audio Desk'),
+('MTA-AST-90223', 'Blackmagic ATEM Television Studio Pro 4K', 'In Use', 'Control Room Video Rack'),
+('MTA-AST-90224', 'Epson Pro L1505UH Laser Projector 12000 Lumens', 'In Storage', 'Conference Hall Vault'),
+('MTA-AST-90225', 'Lenovo ThinkCentre M90q Tiny Workstation PC', 'In Use', 'Graphics Department'),
+('MTA-AST-90226', 'LG UltraFine 32-inch 4K Color Grading Monitor', 'In Use', 'Post-Production Room 01'),
+('MTA-AST-90227', 'Shure SM7B Vocal Studio Microphone Set', 'In Use', 'Radio Broadcast Suite'),
+('MTA-AST-90228', 'Synology DiskStation DS3622xs+ 12-Bay NAS Server', 'In Use', 'Server Room Rack 02'),
+('MTA-AST-90229', 'Aputure LS 600d Pro Daylight LED Video Light', 'In Use', 'Studio A Lighting Grid'),
+('MTA-AST-90230', 'Fortinet FortiGate 100F Next-Gen Firewall', 'In Use', 'IT Infrastructure Rack'),
+('MTA-AST-90231', 'Kyocera ECOSYS M3655idn Mono Laser MFP', 'In Use', 'Accounts & HR Office'),
+('MTA-AST-90232', 'DJI Ronin 4D 6K Cinema Gimbal Camera System', 'In Storage', 'Media Production Locker'),
+('MTA-AST-90233', 'Motorola MOTOTRBO DP4801e VHF Two-Way Radios (Set of 10)', 'In Use', 'Security & Field Ops');
 
 -- Office Maintenance
 INSERT INTO public.office_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES
 ('2026-08-01', 'Perkins 150kVA Standby Generator monthly servicing & oil change', 'In Progress', 'Engine oil drained, new filters installed.', 'Generator House', 'Mantrac Engineers', 1850.00),
 ('2026-07-30', 'Studio B Acoustic Panel wall mounting & soundproofing repair', 'Resolved', 'Re-anchored 6 soundproof panels.', 'Studio B', 'Rehan Mahmood (Acoustic Spec)', 650.00),
 ('2026-08-03', 'Server Room Dedicated Precision AC Unit high temperature alarm', 'Open', 'Contractor scheduled for Freon gas pressure check.', 'Server Room', 'Unassigned', 0.00),
-('2026-07-28', 'UPS Battery Bank Cell 04 voltage calibration', 'Resolved', 'Calibrated battery management system.', 'Power Room', 'APC Tech', 920.00);
+('2026-07-28', 'UPS Battery Bank Cell 04 voltage calibration', 'Resolved', 'Calibrated battery management system.', 'Power Room', 'APC Tech', 920.00),
+('2026-07-22', 'Reception LED Video Wall panel 3 flicker fault', 'Resolved', 'Replaced flat ribbon interconnect cable', 'Reception Entrance', 'Digital Signage Tech', 350.00),
+('2026-07-24', 'Executive Boardroom HDMI Pass-through table box loose connection', 'Resolved', 'Re-soldered HDMI transmitter port', 'Boardroom', 'AV Maintenance', 180.00),
+('2026-07-26', 'Roof gutter drainage overflow during heavy rainfall', 'Resolved', 'Cleared leaves and debris blockage', 'Main Building Roof', 'Facilities Crew', 200.00),
+('2026-07-27', 'Automatic sliding glass entry door motor noise', 'Resolved', 'Replaced drive belt and greased tracks', 'Main Entrance', 'Dorma Glass Tech', 420.00),
+('2026-08-02', 'Water dispenser chiller cooling compressor fail', 'Open', 'Quotations requested for compressor replacement', 'Staff Cafeteria', 'Unassigned', 0.00),
+('2026-08-04', 'Fire Alarm Control Panel Zone 2 sensor false trip', 'In Progress', 'Testing optical smoke detector sensitivity', '1st Floor East Wing', 'Safety First Ltd', 300.00),
+('2026-08-05', 'Studio A motorized teleprompter rig counterbalance fix', 'Resolved', 'Tightened tension springs and balanced weights', 'Studio A', 'Broadcast Support Tech', 150.00),
+('2026-08-06', 'Accounts office paper shredder motor jam', 'Resolved', 'Cleared metal staple jam and lubricated gears', 'Accounts Office', 'IT Support', 50.00),
+('2026-08-07', 'Substation automatic transfer switch (ATS) relay check', 'In Progress', 'Simulating main grid power failure sequence', 'Electrical Substation', 'ECG Certified Engineer', 800.00),
+('2026-08-08', 'Post-Production Room 01 split AC unit remote sensor un-responsive', 'Open', null, 'Post-Production Room 01', 'Unassigned', 0.00),
+('2026-08-09', 'Restroom automatic touchless faucet sensor failure', 'In Progress', 'Replacing solenoid valve kit', 'Ground Floor Restroom', 'Adnan Siddiqui', 220.00),
+('2026-08-10', 'Server Room biometrics access control reader reset', 'Resolved', 'Updated firmware and recalibrated fingerprint scanner', 'Server Room Door', 'IT Security Team', 100.00),
+('2026-08-10', 'Parking lot solar LED floodlight lamp failure', 'Open', null, 'Staff Parking Area', 'Unassigned', 0.00),
+('2026-08-10', 'Conference Room motorized projection screen limit switch fault', 'Open', null, 'Conference Room', 'Unassigned', 0.00);
 
 -- Activity Logs
 INSERT INTO public.activity_logs (timestamp, user_id, user_name, user_avatar, action, module_name, record_affected, details) VALUES

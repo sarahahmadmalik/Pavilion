@@ -552,3 +552,87 @@ html, body, #root {
   box-shadow: 0 8px 24px -4px rgba(26, 63, 160, 0.15) !important;
 }
 
+/* ==========================================================================
+   PROFILE & SETTINGS RESPONSIVE STYLES
+   ========================================================================== */
+.profile-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.profile-card {
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.profile-theme-card {
+  padding: 1.5rem;
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.profile-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 640px) {
+  .profile-card {
+    flex-direction: column;
+    text-align: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+  .profile-card-details {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .profile-theme-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+  .profile-theme-card button {
+    width: 100%;
+    justify-content: center;
+  }
+  .profile-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-actions {
+    flex-direction: column;
+  }
+  .profile-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+

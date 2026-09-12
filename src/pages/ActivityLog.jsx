@@ -6,7 +6,7 @@ import { SlideOver } from '../components/common/SlideOver.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
 import { ErrorBanner } from '../components/common/ErrorBanner.jsx';
 import {
-  Search, FileSpreadsheet, ChevronDown, ChevronUp, Clock, Eye, X,
+  Search, ChevronDown, ChevronUp, Clock, Eye, X,
   User, Tag, PenLine, Trash2, Plus, Info
 } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
@@ -218,7 +218,7 @@ const InspectPanel = ({ log }) => {
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
+export const ActivityLog = ({ searchQuery }) => {
   const { currentUser } = useAuth();
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -276,14 +276,6 @@ export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
 
   useEffect(() => { setCurrentPage(1); }, [query, moduleFilter, actionFilter]);
 
-  const exportColumns = [
-    { label: 'Timestamp', key: 'timestamp' },
-    { label: 'User Name', key: 'userName' },
-    { label: 'Action', key: 'action' },
-    { label: 'Module', key: 'moduleName' },
-    { label: 'Record Affected', key: 'recordAffected' }
-  ];
-
   const hasActiveFilters = moduleFilter !== 'All' || actionFilter !== 'All' || localSearch;
 
   return (
@@ -299,12 +291,6 @@ export const ActivityLog = ({ searchQuery, triggerExportModal }) => {
             Full audit trail of all user actions across MTA Ghana.
           </p>
         </div>
-        <button
-          className="btn btn-export"
-          onClick={() => triggerExportModal?.('Activity Audit Logs', filteredLogs, exportColumns, logs)}
-        >
-          <FileSpreadsheet size={16} /> Export
-        </button>
       </div>
 
       {/* Error Banner */}

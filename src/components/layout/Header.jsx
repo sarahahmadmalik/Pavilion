@@ -43,9 +43,6 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
   const isDashboard = activePage === 'dashboard';
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
 
-  // Notification rules: Bell is ONLY shown to super_admin or admin
-  const canReceiveNotifications = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
-
   return (
     <header style={{
       height: '68px',
@@ -120,23 +117,38 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             : <Sun size={18} color="#F59E0B" />}
         </button>
 
-        {/* Notification Bell — ONLY for super_admin and admin */}
-        {canReceiveNotifications && (
-          <button
-            onClick={onOpenNotifications}
-            className="btn btn-ghost"
-            style={{ padding: '0.5rem', borderRadius: '50%', position: 'relative' }}
-            title="System Notifications"
-          >
-            <Bell size={18} color="var(--text-muted)" />
-            {unreadCount > 0 && (
+        {/* Notification Bell — visible to every role */}
+        <button
+          onClick={onOpenNotifications}
+          className="btn btn-ghost"
+          style={{ padding: '0.5rem', borderRadius: '50%', position: 'relative' }}
+          title="Notifications"
+        >
+          <Bell size={18} color="var(--text-muted)" />
+          {unreadCount > 0 && (
+            <>
+              {/* Pulsing glow ring behind the badge */}
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: '#EF4444',
+                  opacity: 0.55,
+                  animation: 'notifPulseRing 1.8s ease-out infinite'
+                }}
+              />
               <span style={{
                 position: 'absolute',
                 top: '2px',
                 right: '2px',
                 minWidth: '16px',
                 height: '16px',
-                backgroundColor: '#EF4444',
+                background: 'linear-gradient(145deg, #F87171, #DC2626)',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -145,13 +157,21 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
                 fontSize: '0.5625rem',
                 fontWeight: 700,
                 padding: '0 3px',
-                lineHeight: 1
+                lineHeight: 1,
+                boxShadow: '0 0 0 2px var(--bg-header), 0 1px 4px rgba(220,38,38,0.5)'
               }}>
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
-            )}
-          </button>
-        )}
+              <style>{`
+                @keyframes notifPulseRing {
+                  0% { transform: scale(1); opacity: 0.55; }
+                  70% { transform: scale(2.1); opacity: 0; }
+                  100% { transform: scale(2.1); opacity: 0; }
+                }
+              `}</style>
+            </>
+          )}
+        </button>
 
         {/* Profile Avatar Dropdown */}
         <div style={{ position: 'relative' }}>

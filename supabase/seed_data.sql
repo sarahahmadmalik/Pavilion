@@ -1,6 +1,9 @@
 -- ============================================================================
 -- MTA Ghana Operations Dashboard - Complete Supabase Database Seed File
--- Includes Schema, RLS, 3 Accounts (No Profile Pics), & Full Dashboard Seed Data
+-- Includes Schema, RLS, 3 Accounts & Full Dashboard Seed Data
+-- Updated: Removed office_assets. Added vehicles_maintenance.
+--          Added serial_number, cost to guest_house_inventory.
+--          Added notes to office_bill_payments.
 -- ============================================================================
 
 -- 1. ENUMS
@@ -14,10 +17,6 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
     CREATE TYPE inventory_condition AS ENUM ('Good', 'Fair', 'Damaged');
-EXCEPTION WHEN duplicate_object THEN null; END $$;
-
-DO $$ BEGIN
-    CREATE TYPE asset_status AS ENUM ('In Use', 'In Storage', 'Retired');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
@@ -71,16 +70,20 @@ CREATE TABLE IF NOT EXISTS public.guest_house_maintenance (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Updated: serial_number and cost columns added
 CREATE TABLE IF NOT EXISTS public.guest_house_inventory (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     item VARCHAR(255) NOT NULL,
     qty INTEGER NOT NULL DEFAULT 1,
     condition inventory_condition NOT NULL DEFAULT 'Good',
     location VARCHAR(100) NOT NULL,
+    serial_number VARCHAR(100),
+    cost NUMERIC(12, 2) DEFAULT 0.00,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Updated: notes column added
 CREATE TABLE IF NOT EXISTS public.office_bill_payments (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -88,15 +91,20 @@ CREATE TABLE IF NOT EXISTS public.office_bill_payments (
     cheque_no VARCHAR(100) NOT NULL,
     payee VARCHAR(255) NOT NULL,
     amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.office_assets (
+-- NEW: Vehicles Maintenance table (replaces office_assets)
+CREATE TABLE IF NOT EXISTS public.vehicles_maintenance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    barcode VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT NOT NULL,
-    status asset_status NOT NULL DEFAULT 'In Use',
-    location VARCHAR(100) NOT NULL,
+    reported_on DATE NOT NULL DEFAULT CURRENT_DATE,
+    vehicle_name VARCHAR(255) NOT NULL,
+    issue TEXT NOT NULL,
+    status maintenance_status NOT NULL DEFAULT 'Open',
+    updates TEXT,
+    name_of_worker VARCHAR(255),
+    cost NUMERIC(12, 2) DEFAULT 0.00,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -131,7 +139,7 @@ ALTER TABLE public.guest_list ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guest_house_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guest_house_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.office_bill_payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.office_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicles_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.office_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
 
@@ -151,8 +159,8 @@ CREATE POLICY "Allow authenticated read/write on guest_house_inventory" ON publi
 DROP POLICY IF EXISTS "Allow authenticated read/write on office_bill_payments" ON public.office_bill_payments;
 CREATE POLICY "Allow authenticated read/write on office_bill_payments" ON public.office_bill_payments FOR ALL USING (true);
 
-DROP POLICY IF EXISTS "Allow authenticated read/write on office_assets" ON public.office_assets;
-CREATE POLICY "Allow authenticated read/write on office_assets" ON public.office_assets FOR ALL USING (true);
+DROP POLICY IF EXISTS "Allow authenticated read/write on vehicles_maintenance" ON public.vehicles_maintenance;
+CREATE POLICY "Allow authenticated read/write on vehicles_maintenance" ON public.vehicles_maintenance FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Allow authenticated read/write on office_maintenance" ON public.office_maintenance;
 CREATE POLICY "Allow authenticated read/write on office_maintenance" ON public.office_maintenance FOR ALL USING (true);
@@ -168,7 +176,7 @@ TRUNCATE TABLE public.guest_list CASCADE;
 TRUNCATE TABLE public.guest_house_maintenance CASCADE;
 TRUNCATE TABLE public.guest_house_inventory CASCADE;
 TRUNCATE TABLE public.office_bill_payments CASCADE;
-TRUNCATE TABLE public.office_assets CASCADE;
+TRUNCATE TABLE public.vehicles_maintenance CASCADE;
 TRUNCATE TABLE public.office_maintenance CASCADE;
 
 -- 5. INSERT 3 ACCOUNTS INTO SUPABASE AUTH & PUBLIC USERS (No profile pics: avatar = NULL)
@@ -181,7 +189,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 INSERT INTO auth.users (
     id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, recovery_sent_at, last_sign_in_at, raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
-) VALUES 
+) VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@mtaghana.org', crypt('MTA#Ghana2026!SuperSec', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Sara Ahmad Malik"}', false, NOW(), NOW()),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'admin@mtaghana.org', crypt('MTA#Ghana2026!AdminSec', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Usman Khan"}', false, NOW(), NOW()),
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'staff@mtaghana.org', crypt('MTA#Ghana2026!StaffSec', gen_salt('bf')), NOW(), NOW(), NOW(), '{"provider":"email","providers":["email"]}', '{"name":"Hamza Ahmed"}', false, NOW(), NOW())
@@ -193,18 +201,18 @@ INSERT INTO public.users (id, name, email, role, status, avatar) VALUES
 ('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'Hamza Ahmed', 'staff@mtaghana.org', 'staff', 'Active', NULL)
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, status = EXCLUDED.status;
 
--- Staff Permissions Matrix
+-- Staff Permissions Matrix (office_assets removed, vehicles_maintenance added)
 INSERT INTO public.user_permissions (user_id, module_key, can_view, can_add, can_edit, can_delete) VALUES
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'guest_list', true, true, false, false),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'gh_maintenance', true, true, true, false),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'gh_inventory', true, true, true, false),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'office_bills', true, false, false, false),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'office_assets', true, true, false, false),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'office_maintenance', true, false, false, false)
-ON CONFLICT (user_id, module_key) DO UPDATE SET 
-  can_view = EXCLUDED.can_view,
-  can_add = EXCLUDED.can_add,
-  can_edit = EXCLUDED.can_edit,
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'guest_list',           true,  true,  false, false),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'gh_maintenance',       true,  true,  true,  false),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'gh_inventory',         true,  true,  true,  false),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'office_bills',         true,  false, false, false),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'vehicles_maintenance', true,  true,  false, false),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a33', 'office_maintenance',   true,  false, false, false)
+ON CONFLICT (user_id, module_key) DO UPDATE SET
+  can_view   = EXCLUDED.can_view,
+  can_add    = EXCLUDED.can_add,
+  can_edit   = EXCLUDED.can_edit,
   can_delete = EXCLUDED.can_delete;
 
 -- 6. DASHBOARD MODULE SEED DATA
@@ -253,72 +261,62 @@ INSERT INTO public.guest_house_maintenance (reported_on, issue, status, updates,
 ('2026-08-10', 'Window flyscreen netting tear', 'Open', NULL, 'Room 209', 'Unassigned', 0.00),
 ('2026-08-10', 'Intercom telephone line static noise', 'In Progress', 'Checking RJ11 cable connection', 'Reception Desk', 'IT Comms Team', 60.00);
 
--- Guest House Inventory
-INSERT INTO public.guest_house_inventory (item, qty, condition, location, notes) VALUES
-('Egyptian Cotton Bedding Sets', 24, 'Good', 'Linen Store Room', 'Purchased Jan 2026'),
-('Orthopedic King Mattresses', 12, 'Good', 'VIP Suites (101-106)', 'High durability institutional grade'),
-('Daikin 2.0 HP Inverter AC Units', 18, 'Fair', 'Guest Rooms Block A & B', 'Serviced quarterly'),
-('Phillips HD LED Televisions (55 inch)', 8, 'Good', 'VIP Suites & Main Lounge', 'Connected to MTA Satellite'),
-('Bath Towels Set (White Extra Large)', 40, 'Fair', 'Laundry Storage Closet', '8 sets flagged for replacement'),
-('Electric Kettles (Stainless Steel)', 14, 'Good', 'All Guest Suites', 'Checked during check-in protocol'),
-('Mini Refrigerators (90L Silent)', 12, 'Good', 'VIP Suites', 'Energy Star certified'),
-('Steam Irons & Ironing Boards', 10, 'Good', 'Laundry Room / On Demand', 'Heavy duty Tefal irons'),
-('Hair Dryers (Ionic 2000W)', 12, 'Good', 'VIP Bathrooms', 'Wall mounted'),
-('Electronic Room Safes', 10, 'Good', 'VIP Suites', 'Digital keypad lock'),
-('Microwave Ovens (Digital 25L)', 4, 'Good', 'Dining Hall & Staff Pantry', 'Samsung Smart Inverter'),
-('Teak Dining Chairs with Cushion', 32, 'Good', 'Dining Hall', 'Polished hardwood finish'),
-('Executive Mahogany Study Desks', 14, 'Good', 'Guest Rooms', 'Built-in cable grommets'),
-('Blackout Velvet Window Curtains', 28, 'Good', 'Guest Room Windows', 'Fire retardant fabric'),
-('Porcelain Dinnerware Set (64-piece)', 4, 'Good', 'Kitchen Store', 'Royal Doulton pattern'),
-('Stainless Steel Cutlery Set (120-piece)', 3, 'Good', 'Kitchen Store', 'High-grade 18/10 steel'),
-('Commercial Coffee Espresso Machine', 1, 'Good', 'Reception Lounge Bar', 'DeLonghi Dual Pump'),
-('First Aid Medical Kits (Wall Mounted)', 6, 'Good', 'Reception, Kitchen, Corridor', 'Fully stocked emergency kit'),
-('Fire Extinguishers (CO2 5kg)', 10, 'Good', 'Hallways & Kitchen', 'Inspected July 2026'),
-('Luggage Racks (Folding Metallic)', 16, 'Good', 'All Bedrooms', 'Heavy duty steel frame');
+-- Guest House Inventory (now includes serial_number and cost)
+INSERT INTO public.guest_house_inventory (item, qty, condition, location, serial_number, cost, notes) VALUES
+('Egyptian Cotton Bedding Sets', 24, 'Good', 'Linen Store Room', NULL, 1800.00, 'Purchased Jan 2026'),
+('Orthopedic King Mattresses', 12, 'Good', 'VIP Suites (101-106)', NULL, 15000.00, 'High durability institutional grade'),
+('Daikin 2.0 HP Inverter AC Units', 18, 'Fair', 'Guest Rooms Block A & B', NULL, 54000.00, 'Serviced quarterly'),
+('Phillips HD LED Televisions (55 inch)', 8, 'Good', 'VIP Suites & Main Lounge', 'SN-TV55-PH-001', 12000.00, 'Connected to MTA Satellite'),
+('Bath Towels Set (White Extra Large)', 40, 'Fair', 'Laundry Storage Closet', NULL, 2400.00, '8 sets flagged for replacement'),
+('Electric Kettles (Stainless Steel)', 14, 'Good', 'All Guest Suites', NULL, 1960.00, 'Checked during check-in protocol'),
+('Mini Refrigerators (90L Silent)', 12, 'Good', 'VIP Suites', 'SN-RF90-MN-001', 7800.00, 'Energy Star certified'),
+('Steam Irons & Ironing Boards', 10, 'Good', 'Laundry Room / On Demand', NULL, 3500.00, 'Heavy duty Tefal irons'),
+('Hair Dryers (Ionic 2000W)', 12, 'Good', 'VIP Bathrooms', NULL, 1800.00, 'Wall mounted'),
+('Electronic Room Safes', 10, 'Good', 'VIP Suites', 'SN-SF-SEC-001', 5000.00, 'Digital keypad lock'),
+('Microwave Ovens (Digital 25L)', 4, 'Good', 'Dining Hall & Staff Pantry', 'SN-MW25-SS-001', 2400.00, 'Samsung Smart Inverter'),
+('Teak Dining Chairs with Cushion', 32, 'Good', 'Dining Hall', NULL, 9600.00, 'Polished hardwood finish'),
+('Executive Mahogany Study Desks', 14, 'Good', 'Guest Rooms', NULL, 21000.00, 'Built-in cable grommets'),
+('Blackout Velvet Window Curtains', 28, 'Good', 'Guest Room Windows', NULL, 8400.00, 'Fire retardant fabric'),
+('Porcelain Dinnerware Set (64-piece)', 4, 'Good', 'Kitchen Store', NULL, 3200.00, 'Royal Doulton pattern'),
+('Stainless Steel Cutlery Set (120-piece)', 3, 'Good', 'Kitchen Store', NULL, 1800.00, 'High-grade 18/10 steel'),
+('Commercial Coffee Espresso Machine', 1, 'Good', 'Reception Lounge Bar', 'SN-CM-DL-PRO1', 4500.00, 'DeLonghi Dual Pump'),
+('First Aid Medical Kits (Wall Mounted)', 6, 'Good', 'Reception, Kitchen, Corridor', NULL, 1800.00, 'Fully stocked emergency kit'),
+('Fire Extinguishers (CO2 5kg)', 10, 'Good', 'Hallways & Kitchen', NULL, 2500.00, 'Inspected July 2026'),
+('Luggage Racks (Folding Metallic)', 16, 'Good', 'All Bedrooms', NULL, 1600.00, 'Heavy duty steel frame');
 
--- Office Bill Payments
-INSERT INTO public.office_bill_payments (date, company, cheque_no, payee, amount) VALUES
-('2026-08-01', 'Electricity Company of Ghana (ECG)', 'CHK-2026-0891', 'ECG Regional Office Accra', 3450.00),
-('2026-08-02', 'Ghana Water Company Limited', 'CHK-2026-0892', 'GWCL Metered Service Division', 1280.00),
-('2026-07-31', 'MTN Ghana Fibre Broadband', 'CHK-2026-0893', 'MTN Enterprise Business Unit', 2150.00),
-('2026-07-25', 'State Insurance Corporation (SIC)', 'CHK-2026-0894', 'SIC Fixed Property Insurance', 4800.00),
-('2026-07-20', 'Perkins Generator Diesel Supply (GOIL)', 'CHK-2026-0895', 'GOIL Ghana Bulk Supply', 5600.00),
-('2026-07-15', 'Vodafone Ghana Landline & SIP Trunk', 'CHK-2026-0896', 'Vodafone Enterprise Comms', 980.00),
-('2026-07-10', 'Accra Metropolitan Assembly (AMA Property Tax)', 'CHK-2026-0897', 'AMA Revenue Collector', 3200.00),
-('2026-07-05', 'CleanWave Environmental Waste Management', 'CHK-2026-0898', 'CleanWave Ghana Ltd', 650.00),
-('2026-07-01', 'TotalEnergies Fleet Fuel Cards', 'CHK-2026-0899', 'TotalEnergies Ghana HQ', 4100.00),
-('2026-06-28', 'Pest Control Services Ghana', 'CHK-2026-0900', 'Fumigation & Pest Specialist', 750.00),
-('2026-06-25', 'Elevator Maintenance Contract (Otis Ghana)', 'CHK-2026-0901', 'Otis Elevator Company Services', 2400.00),
-('2026-06-20', 'Security Guard Services (G4S Ghana)', 'CHK-2026-0902', 'G4S Security Solutions', 6800.00),
-('2026-06-15', 'Office Stationary & Paper Supplies (Papyrus Ltd)', 'CHK-2026-0903', 'Papyrus Stationers Accra', 1450.00),
-('2026-06-10', 'Air Conditioning Maintenance Contract', 'CHK-2026-0904', 'CoolTech HVAC Solutions', 1900.00),
-('2026-06-05', 'Janitorial & Cleaning Supplies (Hygiene First)', 'CHK-2026-0905', 'Hygiene First Distributors', 890.00),
-('2026-05-30', 'Fire Safety Systems Inspection Fee', 'CHK-2026-0906', 'Ghana National Fire Service', 500.00),
-('2026-05-25', 'Domain & Cloud Hosting Renewal', 'CHK-2026-0907', 'Web4Africa Hosting Division', 1120.00),
-('2026-05-20', 'CCTV Surveillance Cloud Backup License', 'CHK-2026-0908', 'Hikvision Authorized Vendor', 1650.00);
+-- Office Bill Payments (now includes notes)
+INSERT INTO public.office_bill_payments (date, company, cheque_no, payee, amount, notes) VALUES
+('2026-08-01', 'Electricity Company of Ghana (ECG)', 'CHK-2026-0891', 'ECG Regional Office Accra', 3450.00, 'Monthly electricity bill – main building & guest house'),
+('2026-08-02', 'Ghana Water Company Limited', 'CHK-2026-0892', 'GWCL Metered Service Division', 1280.00, 'Monthly water utility'),
+('2026-07-31', 'MTN Ghana Fibre Broadband', 'CHK-2026-0893', 'MTN Enterprise Business Unit', 2150.00, 'Monthly internet & SIP trunk'),
+('2026-07-25', 'State Insurance Corporation (SIC)', 'CHK-2026-0894', 'SIC Fixed Property Insurance', 4800.00, 'Annual property insurance premium'),
+('2026-07-20', 'Perkins Generator Diesel Supply (GOIL)', 'CHK-2026-0895', 'GOIL Ghana Bulk Supply', 5600.00, 'Diesel refill for 150kVA standby generator'),
+('2026-07-15', 'Vodafone Ghana Landline & SIP Trunk', 'CHK-2026-0896', 'Vodafone Enterprise Comms', 980.00, NULL),
+('2026-07-10', 'Accra Metropolitan Assembly (AMA Property Tax)', 'CHK-2026-0897', 'AMA Revenue Collector', 3200.00, 'Q2 2026 property rates'),
+('2026-07-05', 'CleanWave Environmental Waste Management', 'CHK-2026-0898', 'CleanWave Ghana Ltd', 650.00, 'Monthly waste collection contract'),
+('2026-07-01', 'TotalEnergies Fleet Fuel Cards', 'CHK-2026-0899', 'TotalEnergies Ghana HQ', 4100.00, 'Fleet fuel – monthly top-up'),
+('2026-06-28', 'Pest Control Services Ghana', 'CHK-2026-0900', 'Fumigation & Pest Specialist', 750.00, 'Quarterly fumigation & termite treatment'),
+('2026-06-25', 'Elevator Maintenance Contract (Otis Ghana)', 'CHK-2026-0901', 'Otis Elevator Company Services', 2400.00, 'Bi-annual preventive maintenance'),
+('2026-06-20', 'Security Guard Services (G4S Ghana)', 'CHK-2026-0902', 'G4S Security Solutions', 6800.00, 'Monthly guards contract – 8 posts'),
+('2026-06-15', 'Office Stationary & Paper Supplies (Papyrus Ltd)', 'CHK-2026-0903', 'Papyrus Stationers Accra', 1450.00, NULL),
+('2026-06-10', 'Air Conditioning Maintenance Contract', 'CHK-2026-0904', 'CoolTech HVAC Solutions', 1900.00, 'Annual HVAC service contract'),
+('2026-06-05', 'Janitorial & Cleaning Supplies (Hygiene First)', 'CHK-2026-0905', 'Hygiene First Distributors', 890.00, 'Monthly cleaning consumables'),
+('2026-05-30', 'Fire Safety Systems Inspection Fee', 'CHK-2026-0906', 'Ghana National Fire Service', 500.00, 'Annual compliance inspection'),
+('2026-05-25', 'Domain & Cloud Hosting Renewal', 'CHK-2026-0907', 'Web4Africa Hosting Division', 1120.00, 'Annual domain & hosting renewal'),
+('2026-05-20', 'CCTV Surveillance Cloud Backup License', 'CHK-2026-0908', 'Hikvision Authorized Vendor', 1650.00, 'Annual cloud backup license – 64 cameras');
 
--- Office Assets
-INSERT INTO public.office_assets (barcode, description, status, location) VALUES
-('MTA-AST-90214', 'Dell Latitude 5540 i7 16GB RAM Studio Laptop', 'In Use', 'Master Control Room'),
-('MTA-AST-90215', 'Sony HXR-NX80 4K Ultra HD Broadcast Camera', 'In Use', 'Studio A - Main Set'),
-('MTA-AST-90216', 'HP Color LaserJet Enterprise Printer X57745', 'In Use', 'Administration Office'),
-('MTA-AST-90217', 'Cisco Catalyst 9300 48-Port Managed Switch', 'In Use', 'Server Room Rack 01'),
-('MTA-AST-90218', 'Apple Mac Studio M2 Max Video Editing Suite', 'In Use', 'Post-Production Room 02'),
-('MTA-AST-90219', 'Yamaha TF5 32-Channel Digital Mixing Console', 'In Storage', 'Equipment Reserve Vault'),
-('MTA-AST-90220', 'APC Smart-UPS RT 10,000VA 230V Online Battery', 'In Use', 'Main Generator & Power Room'),
-('MTA-AST-90221', 'Canon XA70 Professional UHD 4K Camcorder', 'In Use', 'OB Van Unit 01'),
-('MTA-AST-90222', 'Sennheiser EW-100 G4 Wireless Mic System', 'In Use', 'Studio B Audio Desk'),
-('MTA-AST-90223', 'Blackmagic ATEM Television Studio Pro 4K', 'In Use', 'Control Room Video Rack'),
-('MTA-AST-90224', 'Epson Pro L1505UH Laser Projector 12000 Lumens', 'In Storage', 'Conference Hall Vault'),
-('MTA-AST-90225', 'Lenovo ThinkCentre M90q Tiny Workstation PC', 'In Use', 'Graphics Department'),
-('MTA-AST-90226', 'LG UltraFine 32-inch 4K Color Grading Monitor', 'In Use', 'Post-Production Room 01'),
-('MTA-AST-90227', 'Shure SM7B Vocal Studio Microphone Set', 'In Use', 'Radio Broadcast Suite'),
-('MTA-AST-90228', 'Synology DiskStation DS3622xs+ 12-Bay NAS Server', 'In Use', 'Server Room Rack 02'),
-('MTA-AST-90229', 'Aputure LS 600d Pro Daylight LED Video Light', 'In Use', 'Studio A Lighting Grid'),
-('MTA-AST-90230', 'Fortinet FortiGate 100F Next-Gen Firewall', 'In Use', 'IT Infrastructure Rack'),
-('MTA-AST-90231', 'Kyocera ECOSYS M3655idn Mono Laser MFP', 'In Use', 'Accounts & HR Office'),
-('MTA-AST-90232', 'DJI Ronin 4D 6K Cinema Gimbal Camera System', 'In Storage', 'Media Production Locker'),
-('MTA-AST-90233', 'Motorola MOTOTRBO DP4801e VHF Two-Way Radios (Set of 10)', 'In Use', 'Security & Field Ops');
+-- Vehicles Maintenance (new module replacing office_assets)
+INSERT INTO public.vehicles_maintenance (reported_on, vehicle_name, issue, status, updates, name_of_worker, cost) VALUES
+('2026-08-01', 'Toyota Hilux – GR-1234-24', 'Engine oil change & full service', 'Resolved', 'Synthetic oil 5W-30 replaced, filters changed.', 'AutoTech Garage', 1200.00),
+('2026-08-02', 'Toyota Prado – GR-5678-22', 'Front brake pads worn, vibration on braking', 'In Progress', 'New pads sourced, awaiting fitting.', 'MTA Workshop', 850.00),
+('2026-08-03', 'Toyota Hiace Bus – GR-9012-21', 'AC system not cooling – refrigerant leak', 'Open', NULL, 'Unassigned', 0.00),
+('2026-07-28', 'Mitsubishi L200 – GR-3456-23', 'Right front tyre burst – replacement', 'Resolved', 'New 265/65R17 tyre fitted and wheel balanced.', 'Kwame Tyres Ltd', 650.00),
+('2026-07-25', 'Toyota Land Cruiser VX – GR-7890-20', 'Battery weak, failing to start in mornings', 'Resolved', 'New 95Ah DIN battery installed.', 'AutoTech Garage', 450.00),
+('2026-07-22', 'Toyota Corolla – GR-2345-24', 'Windscreen crack – passenger side', 'Resolved', 'OEM windscreen replaced, re-sealed.', 'Accra Glass Works', 1800.00),
+('2026-08-05', 'Toyota Hilux – GR-1234-24', 'Gearbox oil leak – transmission seal worn', 'Open', NULL, 'Unassigned', 0.00),
+('2026-08-07', 'Mitsubishi Pajero – GR-6789-19', 'Suspension – front left shock absorber failed', 'In Progress', 'Part ordered from importer.', 'MTA Workshop', 2200.00),
+('2026-07-18', 'Toyota Hiace Bus – GR-9012-21', 'Annual roadworthy inspection & renewal', 'Resolved', 'Passed DVLA roadworthy, sticker renewed.', 'DVLA Accra', 300.00),
+('2026-08-09', 'Toyota Prado – GR-5678-22', 'Left side mirror damaged in parking', 'Open', NULL, 'Unassigned', 0.00);
 
 -- Office Maintenance
 INSERT INTO public.office_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES

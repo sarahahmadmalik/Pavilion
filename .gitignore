@@ -41,6 +41,10 @@ coverage/
 # Supabase local state / secrets (if present)
 supabase/.cache
 supabase/.env
+supabase/.temp/
+
+# Playwright MCP test artifacts (screenshots/snapshots from ad-hoc testing)
+.playwright-mcp/
 
 # Misc
 public/static/

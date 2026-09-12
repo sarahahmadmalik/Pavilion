@@ -89,6 +89,8 @@ const toJS_inventory = (r) => ({
   qty: r.qty,
   condition: r.condition,
   location: r.location,
+  serialNumber: r.serial_number,
+  cost: r.cost,
   notes: r.notes,
   createdAt: r.created_at
 });
@@ -98,6 +100,8 @@ const toSQL_inventory = (d) => ({
   qty: d.qty,
   condition: d.condition,
   location: d.location,
+  serial_number: d.serialNumber || null,
+  cost: d.cost || 0,
   notes: d.notes || null
 });
 
@@ -108,6 +112,7 @@ const toJS_bill = (r) => ({
   chequeNo: r.cheque_no,
   payee: r.payee,
   amount: r.amount,
+  notes: r.notes,
   createdAt: r.created_at
 });
 
@@ -116,23 +121,30 @@ const toSQL_bill = (d) => ({
   company: d.company,
   cheque_no: d.chequeNo,
   payee: d.payee,
-  amount: d.amount
+  amount: d.amount,
+  notes: d.notes || null
 });
 
-const toJS_asset = (r) => ({
+const toJS_vehicle = (r) => ({
   id: r.id,
-  barcode: r.barcode,
-  description: r.description,
+  reportedOn: r.reported_on,
+  vehicleName: r.vehicle_name,
+  issue: r.issue,
   status: r.status,
-  location: r.location,
+  updates: r.updates,
+  nameOfWorker: r.name_of_worker,
+  cost: r.cost,
   createdAt: r.created_at
 });
 
-const toSQL_asset = (d) => ({
-  barcode: d.barcode,
-  description: d.description,
+const toSQL_vehicle = (d) => ({
+  reported_on: d.reportedOn,
+  vehicle_name: d.vehicleName,
+  issue: d.issue,
   status: d.status,
-  location: d.location
+  updates: d.updates || null,
+  name_of_worker: d.nameOfWorker || null,
+  cost: d.cost || 0
 });
 
 const toJS_log = (r) => ({
@@ -187,14 +199,39 @@ export async function fetchAllUsers() {
   };
 }
 
+// Creates a REAL, login-capable account: a Supabase Auth user (via the
+// admin-manage-user edge function, since that needs the service-role key)
+// plus the matching public.users profile row, sharing the same id — the same
+// pattern scripts/fixAuth.js already uses for the seeded accounts.
 export async function createUser(formData, currentUser) {
-  const { data, error } = await supabase.from('users').insert({
+  const { data: authResult, error: authError } = await supabase.functions.invoke('admin-manage-user', {
+    body: { action: 'create', email: formData.email, password: formData.password, name: formData.name }
+  });
+
+  if (authError) {
+    return { data: null, error: { message: 'Could not reach the user management service. Has admin-manage-user been deployed?' } };
+  }
+  if (!authResult?.success) {
+    return { data: null, error: { message: authResult?.error || 'Failed to create the login account.' } };
+  }
+
+  const newId = authResult.userId;
+
+  // Clean up any stale profile row left behind by an earlier broken attempt
+  // (same email, different/orphaned id) so the email's unique constraint
+  // doesn't block this — otherwise a once-broken account can never be fixed
+  // by recreating it.
+  await supabase.from('users').delete().eq('email', formData.email).neq('id', newId);
+
+  const { data, error } = await supabase.from('users').upsert({
+    id: newId,
     name: formData.name,
     email: formData.email,
     role: formData.role,
     status: formData.status || 'Active',
     avatar: formData.avatar || null
   }).select().single();
+
   if (!error && data) {
     await logActivity(currentUser, 'Created', 'User Management', formData.name);
   }
@@ -217,9 +254,39 @@ export async function updateUser(id, formData, currentUser) {
 }
 
 export async function deleteUser(id, name, currentUser) {
+  // Best-effort: also remove the auth account so the email can be reused later.
+  // Don't block the profile delete on this — an undeployed function shouldn't
+  // make "delete user" unusable, it just leaves an orphaned auth account.
+  try {
+    await supabase.functions.invoke('admin-manage-user', { body: { action: 'delete', userId: id } });
+  } catch (err) {
+    console.error('admin-manage-user delete invoke failed:', err);
+  }
+
   const { error } = await supabase.from('users').delete().eq('id', id);
   if (!error) await logActivity(currentUser, 'Deleted', 'User Management', name);
   return { error: normalizeError(error) };
+}
+
+// Actually changes a user's login password (Super Admin only) via the
+// admin-reset-password edge function — this needs the service-role key,
+// which must stay server-side, never in the browser bundle.
+export async function resetUserPassword(userId, newPassword, currentUser) {
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+      body: { userId, newPassword }
+    });
+    if (error) {
+      return { error: { message: 'Could not reach the password reset service. Has admin-reset-password been deployed?' } };
+    }
+    if (!data?.success) {
+      return { error: { message: data?.error || 'Password reset failed.' } };
+    }
+    await logActivity(currentUser, 'Edited', 'User Management', 'Reset a user account password');
+    return { error: null };
+  } catch (err) {
+    return { error: { message: 'Password reset failed.' } };
+  }
 }
 
 export async function upsertUserPermissions(userId, moduleKey, perms) {
@@ -364,34 +431,34 @@ export async function deleteBillPayment(id, company, currentUser) {
   return { error: normalizeError(error) };
 }
 
-// ─── OFFICE ASSETS ────────────────────────────────────────────────────────────
-export async function fetchOfficeAssets(searchQuery = '') {
-  let query = supabase.from('office_assets').select('*').order('created_at', { ascending: false });
+// ─── VEHICLES MAINTENANCE ────────────────────────────────────────────────────────
+export async function fetchVehicleMaintenance(searchQuery = '') {
+  let query = supabase.from('vehicles_maintenance').select('*').order('reported_on', { ascending: false });
   if (searchQuery && searchQuery.trim()) {
     const t = searchQuery.trim();
-    query = query.or(`description.ilike.%${t}%,barcode.ilike.%${t}%,location.ilike.%${t}%`);
+    query = query.or(`vehicle_name.ilike.%${t}%,issue.ilike.%${t}%,name_of_worker.ilike.%${t}%,updates.ilike.%${t}%`);
   }
   const { data, error } = await query;
-  return { data: (data || []).map(toJS_asset), error: normalizeError(error) };
+  return { data: (data || []).map(toJS_vehicle), error: normalizeError(error) };
 }
 
-export async function createOfficeAsset(formData, currentUser) {
+export async function createVehicleMaintenance(formData, currentUser) {
   const { data, error } = await supabase
-    .from('office_assets').insert(toSQL_asset(formData)).select().single();
-  if (!error && data) await logActivity(currentUser, 'Created', 'Office Asset List', formData.description);
-  return { data: data ? toJS_asset(data) : null, error: normalizeError(error) };
+    .from('vehicles_maintenance').insert(toSQL_vehicle(formData)).select().single();
+  if (!error && data) await logActivity(currentUser, 'Created', 'Vehicles Maintenance', formData.vehicleName);
+  return { data: data ? toJS_vehicle(data) : null, error: normalizeError(error) };
 }
 
-export async function updateOfficeAsset(id, formData, currentUser) {
+export async function updateVehicleMaintenance(id, formData, currentUser) {
   const { data, error } = await supabase
-    .from('office_assets').update(toSQL_asset(formData)).eq('id', id).select().single();
-  if (!error) await logActivity(currentUser, 'Edited', 'Office Asset List', formData.description);
-  return { data: data ? toJS_asset(data) : null, error: normalizeError(error) };
+    .from('vehicles_maintenance').update(toSQL_vehicle(formData)).eq('id', id).select().single();
+  if (!error) await logActivity(currentUser, 'Edited', 'Vehicles Maintenance', formData.vehicleName);
+  return { data: data ? toJS_vehicle(data) : null, error: normalizeError(error) };
 }
 
-export async function deleteOfficeAsset(id, description, currentUser) {
-  const { error } = await supabase.from('office_assets').delete().eq('id', id);
-  if (!error) await logActivity(currentUser, 'Deleted', 'Office Asset List', description);
+export async function deleteVehicleMaintenance(id, vehicleName, currentUser) {
+  const { error } = await supabase.from('vehicles_maintenance').delete().eq('id', id);
+  if (!error) await logActivity(currentUser, 'Deleted', 'Vehicles Maintenance', vehicleName);
   return { error: normalizeError(error) };
 }
 
@@ -444,14 +511,14 @@ export async function fetchDashboardStats() {
     { count: ghMaint },
     { count: ghInv },
     { count: bills },
-    { count: assets },
+    { count: vehicleMaint },
     { count: officeMaint }
   ] = await Promise.all([
     supabase.from('guest_list').select('*', { count: 'exact', head: true }),
     supabase.from('guest_house_maintenance').select('*', { count: 'exact', head: true }).neq('status', 'Resolved'),
     supabase.from('guest_house_inventory').select('*', { count: 'exact', head: true }),
     supabase.from('office_bill_payments').select('*', { count: 'exact', head: true }),
-    supabase.from('office_assets').select('*', { count: 'exact', head: true }),
+    supabase.from('vehicles_maintenance').select('*', { count: 'exact', head: true }).neq('status', 'Resolved'),
     supabase.from('office_maintenance').select('*', { count: 'exact', head: true }).neq('status', 'Resolved')
   ]);
 
@@ -462,9 +529,9 @@ export async function fetchDashboardStats() {
 
   return {
     guests: guests || 0,
-    openMaintenance: (ghMaint || 0) + (officeMaint || 0),
+    openMaintenance: (ghMaint || 0) + (officeMaint || 0) + (vehicleMaint || 0),
     inventory: ghInv || 0,
-    assets: assets || 0,
+    vehicleMaint: vehicleMaint || 0,
     bills: bills || 0,
     totalBillsAmount: totalBills
   };
@@ -495,5 +562,345 @@ export async function markAllNotificationsAsRead() {
     .from('notifications')
     .update({ is_read: true })
     .eq('is_read', false);
+  return { error: normalizeError(error) };
+}
+
+// Permanently clears all of the current user's notifications (RLS scopes this to their own rows)
+export async function clearAllNotifications(userId) {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', userId);
+  return { error: normalizeError(error) };
+}
+
+// ─── TICKET SYSTEM ────────────────────────────────────────────────────────────
+
+const toJS_ticket = (r) => ({
+  id: r.id,
+  ticketNo: r.ticket_no,
+  createdBy: r.created_by,
+  createdByName: r.created_by_name,
+  createdByEmail: r.created_by_email,
+  category: r.category,
+  linkedRecordId: r.linked_record_id,
+  linkedRecordLabel: r.linked_record_label,
+  subject: r.subject,
+  description: r.description,
+  status: r.status,
+  priority: r.priority,
+  closedBy: r.closed_by,
+  closedAt: r.closed_at,
+  lastActivityAt: r.last_activity_at,
+  createdAt: r.created_at,
+  replies: (r.ticket_replies || []).map(toJS_reply)
+});
+
+const toJS_reply = (r) => ({
+  id: r.id,
+  ticketId: r.ticket_id,
+  authorId: r.author_id,
+  authorName: r.author_name,
+  authorRole: r.author_role,
+  message: r.message,
+  createdAt: r.created_at
+});
+
+// Push a row into the shared notifications table. `ticketId` is optional —
+// used to deep-link ticket-related notifications; omit it for non-ticket ones
+// (e.g. a permission change) so staff only ever see ticket or account-access
+// notifications, never generic activity noise.
+async function pushNotification(userIds, ticketId, title, message) {
+  if (!userIds || userIds.length === 0) return;
+  const rows = userIds.map(uid => ({
+    user_id: uid,
+    ticket_id: ticketId,
+    title,
+    message
+  }));
+  await supabase.from('notifications').insert(rows);
+}
+
+// Helper — get all admin/super_admin user IDs
+async function getAdminIds() {
+  const { data } = await supabase
+    .from('users')
+    .select('id')
+    .in('role', ['admin', 'super_admin']);
+  return (data || []).map(u => u.id);
+}
+
+// Helper — fire the ticket email edge function; never throws (email is best-effort)
+async function sendTicketEmail(payload) {
+  try {
+    await supabase.functions.invoke('send-ticket-email', { body: payload });
+  } catch (err) {
+    console.error('send-ticket-email invoke failed:', err);
+  }
+}
+
+// Fetch all tickets (admin sees all, staff sees own)
+export async function fetchTickets(currentUser, searchQuery = '') {
+  let query = supabase
+    .from('tickets')
+    .select('*, ticket_replies(id)')
+    .order('created_at', { ascending: false });
+
+  if (currentUser?.role === 'staff') {
+    query = query.eq('created_by', currentUser.id);
+  }
+  if (searchQuery?.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`subject.ilike.%${t}%,created_by_name.ilike.%${t}%,category.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
+  return { data: (data || []).map(toJS_ticket), error: normalizeError(error) };
+}
+
+// Fetch a single ticket with full reply thread
+export async function fetchTicketById(id) {
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*, ticket_replies(*)')
+    .eq('id', id)
+    .order('created_at', { ascending: true, referencedTable: 'ticket_replies' })
+    .single();
+  return { data: data ? toJS_ticket(data) : null, error: normalizeError(error) };
+}
+
+// Create a new ticket + notify all admins in-app
+export async function createTicket(formData, currentUser) {
+  if (['admin', 'super_admin'].includes(currentUser?.role)) {
+    return { data: null, error: { message: 'Admins manage tickets and cannot raise new ones.' } };
+  }
+
+  const payload = {
+    created_by: currentUser.id,
+    created_by_name: currentUser.name,
+    created_by_email: currentUser.email,
+    category: formData.category || 'Custom',
+    linked_record_id: formData.linkedRecordId || null,
+    linked_record_label: formData.linkedRecordLabel || null,
+    subject: sanitizeInput(formData.subject),
+    description: sanitizeInput(formData.description),
+    status: 'Open',
+    priority: formData.priority || 'Normal',
+    last_activity_at: new Date().toISOString()
+  };
+
+  const { data, error } = await supabase
+    .from('tickets')
+    .insert(payload)
+    .select()
+    .single();
+
+  if (!error && data) {
+    const adminIds = await getAdminIds();
+    const notifyIds = adminIds.filter(id => id !== currentUser.id);
+    await pushNotification(
+      notifyIds,
+      data.id,
+      `New Ticket #${data.ticket_no}: ${formData.subject}`,
+      `${currentUser.name} opened a ${formData.category} ticket — "${formData.subject}"`
+    );
+    await sendTicketEmail({ type: 'new_ticket', ticketId: data.id });
+  }
+
+  return { data: data ? toJS_ticket(data) : null, error: normalizeError(error) };
+}
+
+// Reply to a ticket — updates last_activity_at + notifies relevant parties
+export async function replyToTicket(ticketId, message, currentUser, ticket) {
+  const replyPayload = {
+    ticket_id: ticketId,
+    author_id: currentUser.id,
+    author_name: currentUser.name,
+    author_role: currentUser.role,
+    message: sanitizeInput(message)
+  };
+
+  const { data: replyData, error } = await supabase
+    .from('ticket_replies')
+    .insert(replyPayload)
+    .select()
+    .single();
+
+  if (!error) {
+    // Update ticket status to "In Progress" and bump last_activity_at
+    await supabase
+      .from('tickets')
+      .update({
+        status: ticket?.status === 'Open' && currentUser.role !== 'staff' ? 'In Progress' : ticket?.status,
+        last_activity_at: new Date().toISOString()
+      })
+      .eq('id', ticketId);
+
+    // Determine who to notify
+    const isAdmin = ['admin', 'super_admin'].includes(currentUser.role);
+    if (isAdmin && ticket?.createdBy && ticket.createdBy !== currentUser.id) {
+      // Admin replied → notify ticket creator
+      await pushNotification(
+        [ticket.createdBy],
+        ticketId,
+        `Reply on your Ticket #${ticket.ticketNo}`,
+        `${currentUser.name} replied to your ticket — "${ticket.subject}"`
+      );
+    } else if (!isAdmin) {
+      // Staff replied → notify all admins
+      const adminIds = await getAdminIds();
+      await pushNotification(
+        adminIds,
+        ticketId,
+        `Reply on Ticket #${ticket?.ticketNo}: ${ticket?.subject}`,
+        `${currentUser.name} added a reply — "${message.slice(0, 120)}"`
+      );
+    }
+
+    if (replyData) {
+      await sendTicketEmail({ type: 'reply', ticketId, replyId: replyData.id });
+    }
+  }
+
+  return { data: replyData ? toJS_reply(replyData) : null, error: normalizeError(error) };
+}
+
+// Close a ticket (admin/super_admin only)
+export async function closeTicket(ticketId, currentUser, ticket) {
+  if (!['admin', 'super_admin'].includes(currentUser?.role)) {
+    return { data: null, error: { message: 'Only admins can close tickets.' } };
+  }
+
+  const { data, error } = await supabase
+    .from('tickets')
+    .update({
+      status: 'Closed',
+      closed_by: currentUser.id,
+      closed_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString()
+    })
+    .eq('id', ticketId)
+    .select()
+    .single();
+
+  if (!error) {
+    if (ticket?.createdBy && ticket.createdBy !== currentUser.id) {
+      await pushNotification(
+        [ticket.createdBy],
+        ticketId,
+        `Ticket #${ticket.ticketNo} Closed`,
+        `Your ticket "${ticket.subject}" was closed by ${currentUser.name}.`
+      );
+    }
+    await sendTicketEmail({ type: 'closed', ticketId });
+  }
+
+  return { data: data ? toJS_ticket(data) : null, error: normalizeError(error) };
+}
+
+// Lazy fallback sweep — closes any ticket stale for 45+ days (also runs via pg_cron)
+export async function closeStaleTickets() {
+  const { error } = await supabase.rpc('close_stale_tickets');
+  return { error: normalizeError(error) };
+}
+
+// Notify a user that an admin changed their role/module permissions.
+// This — plus ticket activity — is the ONLY notification a non-admin ever gets.
+export async function notifyPermissionChange(userId, currentUser, newRole) {
+  if (!userId || userId === currentUser?.id) return { error: null };
+  const roleLabel = newRole === 'super_admin' ? 'Super Admin' : newRole === 'admin' ? 'Admin' : 'Staff';
+  await pushNotification(
+    [userId],
+    null,
+    'Your Account Access Was Updated',
+    `${currentUser?.name || 'An administrator'} updated your account. Your role is now ${roleLabel}, with revised module permissions.`
+  );
+  return { error: null };
+}
+
+// ─── TICKET ATTACHMENTS ───────────────────────────────────────────────────────
+// Bucket is private (see ticket_attachments_schema.sql) — anyone without an
+// app session must not be able to pull a file from a bare URL, so links are
+// short-lived signed URLs rather than permanent public ones.
+const ATTACHMENTS_BUCKET = 'ticket-attachments';
+const ATTACHMENT_URL_TTL_SECONDS = 60 * 60; // 1 hour
+
+async function getAttachmentSignedUrl(path) {
+  const { data, error } = await supabase.storage.from(ATTACHMENTS_BUCKET).createSignedUrl(path, ATTACHMENT_URL_TTL_SECONDS);
+  if (error) return null;
+  return data?.signedUrl || null;
+}
+
+const toJS_attachment = (r) => ({
+  id: r.id,
+  ticketId: r.ticket_id,
+  replyId: r.reply_id,
+  uploadedBy: r.uploaded_by,
+  uploadedByName: r.uploaded_by_name,
+  fileName: r.file_name,
+  filePath: r.file_path,
+  fileType: r.file_type,
+  fileSize: r.file_size,
+  createdAt: r.created_at
+});
+
+export async function uploadTicketAttachment(file, ticketId, replyId, currentUser) {
+  const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const path = `${ticketId}/${Date.now()}_${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+
+  if (uploadError) return { data: null, error: normalizeError(uploadError) };
+
+  const { data, error } = await supabase
+    .from('ticket_attachments')
+    .insert({
+      ticket_id: ticketId,
+      reply_id: replyId || null,
+      uploaded_by: currentUser.id,
+      uploaded_by_name: currentUser.name,
+      file_name: file.name,
+      file_path: path,
+      file_type: file.type,
+      file_size: file.size
+    })
+    .select()
+    .single();
+
+  if (error || !data) return { data: null, error: normalizeError(error) };
+
+  const url = await getAttachmentSignedUrl(data.file_path);
+  return { data: { ...toJS_attachment(data), url }, error: null };
+}
+
+export async function fetchTicketAttachments(ticketId) {
+  const { data, error } = await supabase
+    .from('ticket_attachments')
+    .select('*')
+    .eq('ticket_id', ticketId)
+    .order('created_at', { ascending: true });
+
+  if (error) return { data: [], error: normalizeError(error) };
+
+  const withUrls = await Promise.all(
+    (data || []).map(async (r) => ({ ...toJS_attachment(r), url: await getAttachmentSignedUrl(r.file_path) }))
+  );
+  return { data: withUrls, error: null };
+}
+
+// ─── BULK ROW ACTIONS ─────────────────────────────────────────────────────────
+// Generic helpers reused by every list page's checkbox multi-select toolbar.
+export async function bulkDeleteRecords(table, ids, currentUser, moduleLabel) {
+  if (!ids || ids.length === 0) return { error: null };
+  const { error } = await supabase.from(table).delete().in('id', ids);
+  if (!error) await logActivity(currentUser, 'Deleted', moduleLabel, `${ids.length} record(s) (bulk)`);
+  return { error: normalizeError(error) };
+}
+
+export async function bulkUpdateFields(table, ids, fields, currentUser, moduleLabel) {
+  if (!ids || ids.length === 0) return { error: null };
+  const { error } = await supabase.from(table).update(fields).in('id', ids);
+  if (!error) await logActivity(currentUser, 'Edited', moduleLabel, `${ids.length} record(s) (bulk)`);
   return { error: normalizeError(error) };
 }

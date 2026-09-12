@@ -5,7 +5,7 @@ import {
   fetchGHMaintenance,
   fetchGHInventory,
   fetchBillPayments,
-  fetchOfficeAssets,
+  fetchVehicleMaintenance,
   fetchOfficeMaintenance,
   fetchActivityLogs
 } from '../lib/supabaseService.js';
@@ -22,7 +22,7 @@ import {
   UserCheck,
   Wrench,
   CreditCard,
-  Barcode,
+  Car,
   ArrowRight,
   Activity,
   ChevronRight,
@@ -86,7 +86,7 @@ export const Dashboard = ({ setActivePage }) => {
     ghMaintenance: [],
     officeMaintenance: [],
     bills: [],
-    officeAssets: [],
+    vehicleMaintenance: [],
     activityLogs: []
   });
 
@@ -100,19 +100,19 @@ export const Dashboard = ({ setActivePage }) => {
         ghMaintRes,
         officeMaintRes,
         billsRes,
-        officeAssetsRes,
+        vehicleMaintRes,
         logsRes
       ] = await Promise.all([
         fetchGuests(),
         fetchGHMaintenance(),
         fetchOfficeMaintenance(),
         fetchBillPayments(),
-        fetchOfficeAssets(),
+        fetchVehicleMaintenance(),
         fetchActivityLogs(20)
       ]);
 
       // Check for critical errors (don't crash on partial failure)
-      const hasError = [guestsRes, ghMaintRes, officeMaintRes, billsRes, officeAssetsRes].some(r => r.error);
+      const hasError = [guestsRes, ghMaintRes, officeMaintRes, billsRes, vehicleMaintRes].some(r => r.error);
       if (hasError) {
         setError('Could not load some data from the server. Showing what was available.');
       }
@@ -122,7 +122,7 @@ export const Dashboard = ({ setActivePage }) => {
         ghMaintenance: ghMaintRes.data || [],
         officeMaintenance: officeMaintRes.data || [],
         bills: billsRes.data || [],
-        officeAssets: officeAssetsRes.data || [],
+        vehicleMaintenance: vehicleMaintRes.data || [],
         activityLogs: logsRes.data || []
       });
     } catch (err) {
@@ -139,13 +139,13 @@ export const Dashboard = ({ setActivePage }) => {
   // ─── Computed stats ───────────────────────────────────────────────────────
   const totalGuests = data.guests.length;
 
-  const allMaintenance = [...data.ghMaintenance, ...data.officeMaintenance];
+  const allMaintenance = [...data.ghMaintenance, ...data.officeMaintenance, ...data.vehicleMaintenance];
   const openMaintenanceCount = allMaintenance.filter(m => m.status === 'Open').length;
   const inProgressCount = allMaintenance.filter(m => m.status === 'In Progress').length;
   const resolvedCount = allMaintenance.filter(m => m.status === 'Resolved').length;
 
   const totalBillsAmount = data.bills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
-  const totalAssetsCount = data.officeAssets.length;
+  const vehiclesInRepairCount = data.vehicleMaintenance.filter(v => v.status !== 'Resolved').length;
 
   const role = currentUser?.role || 'staff';
 
@@ -188,17 +188,17 @@ export const Dashboard = ({ setActivePage }) => {
       page: 'office_bills'
     },
     {
-      key: 'office_assets',
-      label: 'Registered Assets',
-      value: totalAssetsCount,
-      subtext: 'Barcode-tagged office items',
-      icon: Barcode,
+      key: 'vehicles_maintenance',
+      label: 'Vehicles In Repair',
+      value: vehiclesInRepairCount,
+      subtext: 'Fleet maintenance in progress',
+      icon: Car,
       iconBg: 'rgba(99,102,241,0.1)',
       iconColor: '#6366F1',
-      page: 'office_assets'
+      page: 'vehicles_maintenance'
     }
   ].filter(card => {
-    if (card.key === 'maintenance') return hasModulePermission('gh_maintenance') || hasModulePermission('office_maintenance');
+    if (card.key === 'maintenance') return hasModulePermission('gh_maintenance') || hasModulePermission('office_maintenance') || hasModulePermission('vehicles_maintenance');
     return hasModulePermission(card.key);
   });
 

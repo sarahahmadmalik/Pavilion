@@ -49,6 +49,8 @@ export const IMPORT_CONFIGS = {
       { header: 'Quantity', key: 'qty', required: true },
       { header: 'Condition (Good/Fair/Poor)', key: 'condition', required: true },
       { header: 'Location', key: 'location', required: true },
+      { header: 'Serial Number', key: 'serial_number', required: false },
+      { header: 'Cost (GHS)', key: 'cost', required: false },
       { header: 'Notes', key: 'notes', required: false },
     ]
   },
@@ -61,17 +63,20 @@ export const IMPORT_CONFIGS = {
       { header: 'Cheque No.', key: 'cheque_no', required: false },
       { header: 'Payee', key: 'payee', required: false },
       { header: 'Amount (GHS)', key: 'amount', required: true },
+      { header: 'Notes', key: 'notes', required: false },
     ]
   },
-  office_assets: {
-    label: 'Office Assets',
-    table: 'office_assets',
+  vehicles_maintenance: {
+    label: 'Vehicles Maintenance',
+    table: 'vehicles_maintenance',
     columns: [
-      { header: 'Barcode / Asset Tag', key: 'barcode', required: true },
-      { header: 'Description', key: 'description', required: true },
-      { header: 'Status (Active/Under Repair/Retired)', key: 'status', required: true },
-      { header: 'Location', key: 'location', required: false },
-      { header: 'Assigned To', key: 'assigned_to', required: false },
+      { header: 'Reported On (YYYY-MM-DD)', key: 'reported_on', required: true },
+      { header: 'Vehicle Name / Reg', key: 'vehicle_name', required: true },
+      { header: 'Issue Description', key: 'issue', required: true },
+      { header: 'Status (Open/In Progress/Resolved)', key: 'status', required: true },
+      { header: 'Worker / Garage Name', key: 'name_of_worker', required: false },
+      { header: 'Cost (GHS)', key: 'cost', required: false },
+      { header: 'Updates / Notes', key: 'updates', required: false },
     ]
   },
   office_maintenance: {
@@ -98,14 +103,14 @@ const SAMPLE_DATA = {
     { 'Reported On (YYYY-MM-DD)': '2026-08-01', 'Issue Description': 'AC Unit Leaking Water in Room 102', 'Status (Open/In Progress/Resolved)': 'Open', 'Location': 'Guest House Block A', 'Worker Name': 'Kwame Maintenance', 'Cost (GHS)': 250, 'Updates / Notes': 'Parts ordered' }
   ],
   gh_inventory: [
-    { 'Item Description': 'Egyptian Cotton Bed Sheets', 'Quantity': 12, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'Main Linen Store', 'Notes': 'Newly delivered stock' },
-    { 'Item Description': 'Smart LED TV 43-inch', 'Quantity': 4, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'VIP Suites', 'Notes': 'Wall mounted' }
+    { 'Item Description': 'Egyptian Cotton Bed Sheets', 'Quantity': 12, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'Main Linen Store', 'Serial Number': '', 'Cost (GHS)': 1500, 'Notes': 'Newly delivered stock' },
+    { 'Item Description': 'Smart LED TV 43-inch', 'Quantity': 4, 'Condition (Good/Fair/Poor)': 'Good', 'Location': 'VIP Suites', 'Serial Number': 'SN-TV43-001', 'Cost (GHS)': 4500, 'Notes': 'Wall mounted' }
   ],
   office_bills: [
-    { 'Date (YYYY-MM-DD)': '2026-08-05', 'Company / Utility': 'Ghana Water Company', 'Cheque No.': 'CHK-2026-8812', 'Payee': 'GWC Operations Ltd', 'Amount (GHS)': 450 }
+    { 'Date (YYYY-MM-DD)': '2026-08-05', 'Company / Utility': 'Ghana Water Company', 'Cheque No.': 'CHK-2026-8812', 'Payee': 'GWC Operations Ltd', 'Amount (GHS)': 450, 'Notes': 'Monthly water bill' }
   ],
-  office_assets: [
-    { 'Barcode / Asset Tag': 'MTA-AST-90214', 'Description': 'Dell UltraSharp 27-inch Monitor', 'Status (Active/Under Repair/Retired)': 'Active', 'Location': 'IT Office', 'Assigned To': 'Kofi Mensah' }
+  vehicles_maintenance: [
+    { 'Reported On (YYYY-MM-DD)': '2026-08-02', 'Vehicle Name / Reg': 'Toyota Hilux GT-1234-24', 'Issue Description': 'Oil change and brake pads replacement', 'Status (Open/In Progress/Resolved)': 'Open', 'Worker / Garage Name': 'AutoTech Garage', 'Cost (GHS)': 1200, 'Updates / Notes': 'Scheduled for next week' }
   ],
   office_maintenance: [
     { 'Reported On (YYYY-MM-DD)': '2026-08-03', 'Issue Description': 'Elevator Door Sensor Malfunction', 'Status (Open/In Progress/Resolved)': 'In Progress', 'Location': 'Main Entrance Lobby', 'Worker Name': 'Otis Elevator Service', 'Cost (GHS)': 1200, 'Updates / Notes': 'Sensor replaced' }

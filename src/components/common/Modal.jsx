@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) => {
@@ -18,7 +19,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) 
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed',
       inset: 0,
@@ -64,6 +65,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) 
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

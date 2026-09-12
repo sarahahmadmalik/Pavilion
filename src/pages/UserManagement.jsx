@@ -5,15 +5,21 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  upsertUserPermissions
+  upsertUserPermissions,
+  notifyPermissionChange,
+  resetUserPassword,
+  bulkDeleteRecords,
+  bulkUpdateFields
 } from '../lib/supabaseService.js';
+import { useSelection } from '../lib/useSelection.js';
 
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
+import { BulkActionBar } from '../components/common/BulkActionBar.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
-import { Plus, Search, Edit, Trash2, Key, Ban, Shield, Lock, Settings, X, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Key, Eye, EyeOff, X } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { TableLoader } from '../components/common/Loader.jsx';
@@ -22,7 +28,6 @@ import { useLayout } from '../components/layout/Layout.jsx';
 
 export const UserManagement = (props) => {
   const layoutContext = useLayout();
-  const triggerExportModal = props.triggerExportModal || layoutContext.triggerExportModal;
   const searchQuery = props.searchQuery || layoutContext.searchQuery;
   const setToast = props.setToast || layoutContext.setToast;
   const { currentUser, refreshUsers } = useAuth();
@@ -45,18 +50,13 @@ export const UserManagement = (props) => {
     role: 'staff',
     status: 'Active',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-    permissions: {
-      guest_list: { view: true, add: true, edit: false, delete: false },
-      gh_maintenance: { view: false, add: false, edit: false, delete: false },
-      gh_inventory: { view: true, add: true, edit: true, delete: false },
-      office_bills: { view: false, add: false, edit: false, delete: false },
-      office_assets: { view: false, add: false, edit: false, delete: false },
-      office_maintenance: { view: false, add: false, edit: false, delete: false }
-    }
+    permissions: {}
   });
 
   // Reset Password Modal State
   const [resetModalState, setResetModalState] = useState({ isOpen: false, user: null, newPassword: '' });
+  const [showResetPwd, setShowResetPwd] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
 
   const MODULE_KEYS = [
@@ -64,9 +64,15 @@ export const UserManagement = (props) => {
     { key: 'gh_maintenance', label: 'Guest House Maintenance' },
     { key: 'gh_inventory', label: 'Guest House Inventory' },
     { key: 'office_bills', label: 'Office Bill Payments' },
-    { key: 'office_assets', label: 'Office Asset List' },
+    { key: 'vehicles_maintenance', label: 'Vehicles Maintenance' },
     { key: 'office_maintenance', label: 'Office Maintenance' }
   ];
+
+  // Staff default to FULL access on every module above — admins customize by
+  // unchecking specific actions/modules per person, not by opting modules in.
+  const FULL_ACCESS = { view: true, add: true, edit: true, delete: true };
+  const defaultStaffPermissions = () =>
+    MODULE_KEYS.reduce((acc, m) => ({ ...acc, [m.key]: { ...FULL_ACCESS } }), {});
 
   const loadData = async (q) => {
     setLoading(true);
@@ -97,6 +103,34 @@ export const UserManagement = (props) => {
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
   const paginatedUsers = filteredUsers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  // Exclude your own account from bulk selection — same rule as the single-row delete button
+  const selectablePageIds = paginatedUsers.filter(u => u.id !== currentUser.id).map(u => u.id);
+  const { selected, toggle, toggleAll, isAllSelected, clear: clearSelection, count: selectedCount } = useSelection(selectablePageIds);
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const { error } = await bulkDeleteRecords('users', Array.from(selected), currentUser, 'User Management');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} user account(s) deleted.` });
+      clearSelection();
+      loadData();
+      refreshUsers?.();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleBulkStatus = async (status) => {
+    const { error } = await bulkUpdateFields('users', Array.from(selected), { status }, currentUser, 'User Management');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} account(s) updated to "${status}".` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingUser(null);
     setFormData({
@@ -106,40 +140,24 @@ export const UserManagement = (props) => {
       role: 'staff',
       status: 'Active',
       avatar: '',
-      permissions: {
-        guest_list: { view: true, add: true, edit: false, delete: false },
-        gh_maintenance: { view: false, add: false, edit: false, delete: false },
-        gh_inventory: { view: true, add: true, edit: true, delete: false },
-        office_bills: { view: false, add: false, edit: false, delete: false },
-        office_assets: { view: false, add: false, edit: false, delete: false },
-        office_maintenance: { view: false, add: false, edit: false, delete: false }
-      }
+      permissions: defaultStaffPermissions()
     });
     setIsSlideOpen(true);
   };
 
   const handleOpenEdit = (user) => {
     setEditingUser(user);
-    setFormData({
-      ...user,
-      permissions: user.permissions || {
-        guest_list: { view: true, add: true, edit: false, delete: false },
-        gh_maintenance: { view: false, add: false, edit: false, delete: false },
-        gh_inventory: { view: true, add: true, edit: true, delete: false },
-        office_bills: { view: false, add: false, edit: false, delete: false },
-        office_assets: { view: false, add: false, edit: false, delete: false },
-        office_maintenance: { view: false, add: false, edit: false, delete: false }
-      }
-    });
+    // Merge over the full-access defaults so any module without a stored
+    // override still shows (and behaves) as fully allowed.
+    const merged = { ...defaultStaffPermissions(), ...(user.permissions || {}) };
+    setFormData({ ...user, permissions: merged });
     setIsSlideOpen(true);
   };
 
   const handleRoleChange = (newRole) => {
     let updatedPermissions = { ...formData.permissions };
     if (newRole === 'super_admin' || newRole === 'admin') {
-      MODULE_KEYS.forEach(m => {
-        updatedPermissions[m.key] = { view: true, add: true, edit: true, delete: true };
-      });
+      updatedPermissions = defaultStaffPermissions();
     }
     setFormData({ ...formData, role: newRole, permissions: updatedPermissions });
   };
@@ -162,13 +180,19 @@ export const UserManagement = (props) => {
     e.preventDefault();
 
     if (editingUser) {
+      const accessChanged = editingUser.role !== formData.role ||
+        JSON.stringify(editingUser.permissions || {}) !== JSON.stringify(formData.permissions || {});
+
       const { data: updated, error } = await updateUser(editingUser.id, formData, currentUser);
       if (!error) {
-        // Save permissions if staff
+        // Persist per-module overrides for staff (admin/super_admin ignore these)
         if (formData.role === 'staff' && formData.permissions) {
           for (const mKey of Object.keys(formData.permissions)) {
             await upsertUserPermissions(editingUser.id, mKey, formData.permissions[mKey]);
           }
+        }
+        if (accessChanged) {
+          await notifyPermissionChange(editingUser.id, currentUser, formData.role);
         }
         setToast?.({ type: 'success', message: `User "${formData.name}" updated successfully.` });
         loadData();
@@ -209,6 +233,21 @@ export const UserManagement = (props) => {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!resetModalState.user || resetModalState.newPassword.length < 6) return;
+    setResettingPassword(true);
+    const { error } = await resetUserPassword(resetModalState.user.id, resetModalState.newPassword, currentUser);
+    setResettingPassword(false);
+
+    if (!error) {
+      setToast?.({ type: 'success', message: `Password reset successfully for ${resetModalState.user.name}.` });
+      setResetModalState({ isOpen: false, user: null, newPassword: '' });
+      setShowResetPwd(false);
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
   const handleToggleStatus = async (user) => {
     const newStatus = user.status === 'Active' ? 'Inactive' : 'Active';
     const { error } = await updateUser(user.id, { ...user, status: newStatus }, currentUser);
@@ -218,12 +257,7 @@ export const UserManagement = (props) => {
     }
   };
 
-  const exportColumns = [
-    { label: 'Name', key: 'name' },
-    { label: 'Email', key: 'email' },
-    { label: 'Role', key: 'role' },
-    { label: 'Status', key: 'status' }
-  ];
+
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -240,12 +274,6 @@ export const UserManagement = (props) => {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            className="btn btn-export"
-            onClick={() => triggerExportModal?.('User Accounts', filteredUsers, exportColumns, users)}
-          >
-            <FileSpreadsheet size={16} /> Export
-          </button>
           <button className="btn btn-primary" onClick={handleOpenAdd}>
             <Plus size={16} /> Create User Account
           </button>
@@ -301,6 +329,18 @@ export const UserManagement = (props) => {
         )}
       </div>
 
+      <BulkActionBar
+        count={selectedCount}
+        onClear={clearSelection}
+        onDelete={() => setConfirmBulkDeleteOpen(true)}
+        deleteLabel="Delete Selected"
+        statusOptions={[
+          { label: 'Active', value: 'Active' },
+          { label: 'Inactive', value: 'Inactive' }
+        ]}
+        onApplyStatus={handleBulkStatus}
+      />
+
       {/* Table Content */}
       {loading ? (
         <TableLoader rows={6} cols={6} />
@@ -309,6 +349,9 @@ export const UserManagement = (props) => {
           <table className="data-table">
             <thead>
               <tr>
+                <th style={{ width: '36px' }}>
+                  <input type="checkbox" checked={isAllSelected} onChange={toggleAll} disabled={selectablePageIds.length === 0} />
+                </th>
                 <th>User Identity</th>
                 <th>Role</th>
                 <th>Status</th>
@@ -319,6 +362,11 @@ export const UserManagement = (props) => {
             <tbody>
               {paginatedUsers.map((user) => (
                 <tr key={user.id}>
+                  <td>
+                    {user.id !== currentUser.id && (
+                      <input type="checkbox" checked={selected.has(user.id)} onChange={() => toggle(user.id)} />
+                    )}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                       <UserAvatar name={user.name} src={user.avatar} size={36} />
@@ -462,7 +510,7 @@ export const UserManagement = (props) => {
             />
           </div>
 
-          {/* Granular Permission Matrix */}
+          {/* Module Access — staff get full access by default; override per-module below */}
           <div style={{
             marginTop: '0.5rem',
             padding: '1.25rem',
@@ -473,19 +521,19 @@ export const UserManagement = (props) => {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <div>
                 <h4 style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-main)' }}>
-                  Granular Module Access Matrix
+                  Module Access
                 </h4>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                   {formData.role === 'staff'
-                    ? 'Check specific actions allowed for this staff user.'
-                    : `Permissions are automatically granted for ${formData.role === 'super_admin' ? 'Super Admin' : 'Admin'} role.`}
+                    ? 'Staff have full access to every module below by default. Uncheck specific actions to restrict this person.'
+                    : `Full access to every module${formData.role === 'admin' ? ' except User Management' : ', including User Management'} — not customizable per person.`}
                 </p>
               </div>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {MODULE_KEYS.map(m => {
-                const perms = formData.permissions?.[m.key] || { view: false, add: false, edit: false, delete: false };
+                const perms = formData.permissions?.[m.key] || FULL_ACCESS;
                 const isLocked = formData.role === 'super_admin' || formData.role === 'admin';
 
                 return (
@@ -531,29 +579,52 @@ export const UserManagement = (props) => {
       {/* Reset Password Modal */}
       <Modal
         isOpen={resetModalState.isOpen}
-        onClose={() => setResetModalState({ isOpen: false, user: null, newPassword: '' })}
+        onClose={() => { setResetModalState({ isOpen: false, user: null, newPassword: '' }); setShowResetPwd(false); }}
         title="Reset User Password"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
             Enter a new password for account <strong>{resetModalState.user?.email}</strong>:
           </p>
-          <input
-            type="password"
-            className="input-control"
-            placeholder="New secure password"
-            value={resetModalState.newPassword}
-            onChange={(e) => setResetModalState({ ...resetModalState, newPassword: e.target.value })}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              type={showResetPwd ? 'text' : 'password'}
+              className="input-control"
+              placeholder="New secure password (min. 6 characters)"
+              style={{ paddingRight: '2.5rem' }}
+              value={resetModalState.newPassword}
+              onChange={(e) => setResetModalState({ ...resetModalState, newPassword: e.target.value })}
+            />
+            <button
+              type="button"
+              onClick={() => setShowResetPwd(!showResetPwd)}
+              style={{
+                position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer',
+                display: 'flex', padding: 0
+              }}
+              title={showResetPwd ? 'Hide password' : 'Show password'}
+            >
+              {showResetPwd ? <EyeOff size={17} /> : <Eye size={17} />}
+            </button>
+          </div>
+          {resetModalState.newPassword && resetModalState.newPassword.length < 6 && (
+            <span className="input-error-msg">Password must be at least 6 characters.</span>
+          )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
-            <button className="btn btn-secondary" onClick={() => setResetModalState({ isOpen: false, user: null, newPassword: '' })}>
+            <button
+              className="btn btn-secondary"
+              disabled={resettingPassword}
+              onClick={() => { setResetModalState({ isOpen: false, user: null, newPassword: '' }); setShowResetPwd(false); }}
+            >
               Cancel
             </button>
-            <button className="btn btn-primary" onClick={() => {
-              setToast?.({ type: 'success', message: `Password reset successfully for ${resetModalState.user?.name}` });
-              setResetModalState({ isOpen: false, user: null, newPassword: '' });
-            }}>
-              Update Password
+            <button
+              className="btn btn-primary"
+              disabled={resettingPassword || resetModalState.newPassword.length < 6}
+              onClick={handleResetPassword}
+            >
+              {resettingPassword ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         </div>
@@ -566,6 +637,15 @@ export const UserManagement = (props) => {
         onConfirm={handleDeleteUser}
         title="Delete User Account"
         message="Are you sure you want to delete this user account permanently?"
+      />
+
+      {/* Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete User Accounts"
+        message={`Are you sure you want to permanently delete ${selectedCount} selected user account(s)?`}
       />
     </div>
   );

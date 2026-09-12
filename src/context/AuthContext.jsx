@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { fetchUserProfile, fetchAllUsers } from '../lib/supabaseService.js';
 
@@ -8,6 +8,13 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [authLoading, setAuthLoading] = useState(true); // initial session check
+
+  // Tracks the currently-loaded user id across renders, without re-subscribing
+  // the auth listener below — used to ignore redundant SIGNED_IN re-emits.
+  const currentUserIdRef = useRef(null);
+  useEffect(() => {
+    currentUserIdRef.current = currentUser?.id || null;
+  }, [currentUser]);
 
   // ── Bootstrap: restore session on page load ─────────────────────────────
   useEffect(() => {
@@ -33,6 +40,11 @@ export const AuthProvider = ({ children }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       if (event === 'SIGNED_IN' && session?.user) {
+        // Supabase re-emits SIGNED_IN for the *same* session whenever the tab
+        // regains focus/visibility (it silently checks/refreshes the token).
+        // Without this guard, every alt-tab back into the app would flash the
+        // full-page loader and re-fetch the profile for no reason.
+        if (currentUserIdRef.current === session.user.id) return;
         setAuthLoading(true);
         await loadUserProfile(session.user.id);
         if (mounted) setAuthLoading(false);
@@ -92,19 +104,6 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: msg };
       }
       
-      // 3. Permissions check
-      if (data?.user) {
-        const { data: profile } = await fetchUserProfile(data.user.id);
-        if (profile && profile.role === 'staff') {
-           // Verify they have at least one permission
-           const perms = profile.permissions;
-           if (!perms || Object.keys(perms).length === 0) {
-              await supabase.auth.signOut();
-              return { success: false, message: 'Your account has no permissions set up. Please contact an administrator.' };
-           }
-        }
-      }
-
       return { success: true, user: data.user };
     } catch (err) {
       return { success: false, message: 'An unexpected error occurred during login.' };
@@ -141,12 +140,16 @@ export const AuthProvider = ({ children }) => {
       return true;
     }
 
-    // Staff: check per-module permissions
+    // Staff: full access to every operational module by default — Activity Log
+    // and User Management are always off-limits. An admin/super_admin can
+    // still restrict specific modules/actions per person via the permission
+    // matrix in User Management; only an explicit override (a stored row)
+    // narrows access below the full-access default.
     if (currentUser.role === 'staff') {
       if (moduleKey === 'user_management' || moduleKey === 'activity_log') return false;
-      const modPerms = currentUser.permissions?.[moduleKey];
-      if (!modPerms) return false;
-      return !!modPerms[action];
+      const override = currentUser.permissions?.[moduleKey];
+      if (!override) return true;
+      return !!override[action];
     }
 
     return false;

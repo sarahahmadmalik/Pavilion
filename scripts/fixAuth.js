@@ -82,7 +82,7 @@ async function fixUsers() {
       { user_id: staffId, module_key: 'gh_maintenance', can_view: true, can_add: true, can_edit: true, can_delete: false },
       { user_id: staffId, module_key: 'gh_inventory', can_view: true, can_add: true, can_edit: true, can_delete: false },
       { user_id: staffId, module_key: 'office_bills', can_view: true, can_add: false, can_edit: false, can_delete: false },
-      { user_id: staffId, module_key: 'office_assets', can_view: true, can_add: true, can_edit: false, can_delete: false },
+      { user_id: staffId, module_key: 'vehicles_maintenance', can_view: true, can_add: true, can_edit: false, can_delete: false },
       { user_id: staffId, module_key: 'office_maintenance', can_view: true, can_add: false, can_edit: false, can_delete: false },
     ];
     

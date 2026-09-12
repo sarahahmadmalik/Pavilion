@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import { Sidebar } from './Sidebar.jsx';
 import { Header } from './Header.jsx';
 import { SlideOver } from '../common/SlideOver.jsx';
+import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
 import { Toast } from '../common/Toast.jsx';
 import { ExportModal } from '../common/ExportModal.jsx';
 import { ImportModal } from '../common/ImportModal.jsx';
 import { PageTransition } from '../common/PageTransition.jsx';
 import { exportToExcel } from '../../lib/exportUtils.js';
 import { batchInsert, generateSampleTemplate, IMPORT_CONFIGS } from '../../lib/importUtils.js';
-import { supabase } from '../../lib/supabase.js';
 
 // Layout Context for reliable child component access to modal triggers
 export const LayoutContext = React.createContext({
@@ -21,33 +22,7 @@ export const LayoutContext = React.createContext({
 });
 
 export const useLayout = () => React.useContext(LayoutContext);
-import {
-  Bell, Activity, Users, Wrench, Package, CreditCard, Barcode, ClipboardList, ShieldCheck,
-  CheckCheck, Clock
-} from 'lucide-react';
-
-// ─── Module icon map ──────────────────────────────────────────────────────────
-const MODULE_ICONS = {
-  'Guest List':            <Users size={16} />,
-  'GH Maintenance':        <Wrench size={16} />,
-  'GH Inventory':          <Package size={16} />,
-  'Office Bills':          <CreditCard size={16} />,
-  'Office Assets':         <Barcode size={16} />,
-  'Office Maintenance':    <Wrench size={16} />,
-  'User Management':       <ShieldCheck size={16} />,
-  'Activity Log':          <ClipboardList size={16} />,
-};
-
-const MODULE_COLORS = {
-  'Guest List':          { bg: 'rgba(26,63,160,0.12)', color: '#1A3FA0' },
-  'GH Maintenance':      { bg: 'rgba(245,158,11,0.12)', color: '#D97706' },
-  'GH Inventory':        { bg: 'rgba(139,92,246,0.12)', color: '#7C3AED' },
-  'Office Bills':        { bg: 'rgba(16,185,129,0.12)', color: '#059669' },
-  'Office Assets':       { bg: 'rgba(236,72,153,0.12)', color: '#DB2777' },
-  'Office Maintenance':  { bg: 'rgba(245,158,11,0.12)', color: '#D97706' },
-  'User Management':     { bg: 'rgba(99,102,241,0.12)', color: '#4F46E5' },
-  'Activity Log':        { bg: 'rgba(6,182,212,0.12)', color: '#0891B2' },
-};
+import { Bell, Ticket, Activity, CheckCheck, Clock, Trash2 } from 'lucide-react';
 
 // ─── Time formatter ───────────────────────────────────────────────────────────
 function formatTime(timestamp) {
@@ -66,14 +41,21 @@ function formatTime(timestamp) {
 }
 
 // ─── Single Notification Card ─────────────────────────────────────────────────
-const NotificationCard = ({ log, isUnread, onRead }) => {
-  const mod = log.moduleName || '';
-  const iconStyle = MODULE_COLORS[mod] || { bg: 'rgba(100,116,139,0.12)', color: '#64748B' };
-  const icon = MODULE_ICONS[mod] || <Activity size={16} />;
+const NotificationCard = ({ notif, onRead, onNavigate }) => {
+  const isUnread = !notif.is_read;
+  const isTicket = !!notif.ticket_id;
+  const iconStyle = isTicket
+    ? { bg: 'rgba(26,63,160,0.12)', color: '#1A3FA0' }
+    : { bg: 'rgba(6,182,212,0.12)', color: '#0891B2' };
+
+  const handleClick = () => {
+    if (isUnread) onRead(notif.id);
+    if (isTicket) onNavigate?.();
+  };
 
   return (
     <div
-      onClick={() => isUnread && onRead(log.id)}
+      onClick={handleClick}
       style={{
         display: 'flex',
         gap: '0.75rem',
@@ -81,12 +63,12 @@ const NotificationCard = ({ log, isUnread, onRead }) => {
         borderRadius: 'var(--radius-md)',
         backgroundColor: isUnread ? 'var(--color-primary-light)' : 'var(--bg-card-hover)',
         border: `1px solid ${isUnread ? 'rgba(26,63,160,0.2)' : 'var(--border-color)'}`,
-        cursor: isUnread ? 'pointer' : 'default',
+        cursor: isUnread || isTicket ? 'pointer' : 'default',
         transition: 'all 0.15s ease',
         position: 'relative'
       }}
-      onMouseEnter={e => { if (isUnread) e.currentTarget.style.opacity = '0.85'; }}
-      onMouseLeave={e => { if (isUnread) e.currentTarget.style.opacity = '1'; }}
+      onMouseEnter={e => { if (isUnread || isTicket) e.currentTarget.style.opacity = '0.85'; }}
+      onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
     >
       {/* Unread dot */}
       {isUnread && (
@@ -96,36 +78,28 @@ const NotificationCard = ({ log, isUnread, onRead }) => {
         }} />
       )}
 
-      {/* Module icon */}
+      {/* Type icon */}
       <div style={{
         width: '36px', height: '36px', borderRadius: 'var(--radius-md)',
         backgroundColor: iconStyle.bg, color: iconStyle.color,
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
       }}>
-        {icon}
+        {isTicket ? <Ticket size={16} /> : <Activity size={16} />}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '2px' }}>
           <span style={{ fontWeight: isUnread ? 700 : 600, fontSize: '0.8125rem', color: 'var(--text-main)', lineHeight: 1.3 }}>
-            {log.userName}
+            {notif.title}
           </span>
           <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
             <Clock size={11} />
-            {formatTime(log.rawTimestamp)}
+            {formatTime(notif.created_at)}
           </span>
         </div>
-        <p style={{ fontSize: '0.8125rem', color: isUnread ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1.4, marginBottom: '4px' }}>
-          <span style={{ textTransform: 'lowercase' }}>{log.action}</span>{' '}
-          <strong style={{ color: 'var(--text-main)' }}>{log.recordAffected}</strong>
+        <p style={{ fontSize: '0.8125rem', color: isUnread ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1.4 }}>
+          {notif.message}
         </p>
-        <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: '3px',
-          fontSize: '0.6875rem', color: iconStyle.color, fontWeight: 600,
-          backgroundColor: iconStyle.bg, padding: '1px 6px', borderRadius: '999px'
-        }}>
-          {icon} {mod}
-        </span>
       </div>
     </div>
   );
@@ -137,12 +111,10 @@ export const Layout = ({ activePage, setActivePage, children }) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Notification state
-  const [notifications, setNotifications] = useState([]);
-  const [readIds, setReadIds] = useState(new Set());
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { notifications, unreadCount, markAsRead, markAllRead, clearAll } = useNotifications() || {};
 
   // Global Export Modal State
   const [exportState, setExportState] = useState({
@@ -245,137 +217,16 @@ export const Layout = ({ activePage, setActivePage, children }) => {
 
   const { currentUser } = useAuth();
 
-  // Helper: Filter logs based on notification rules
-  const filterNotification = (log, userRoleMap = {}) => {
-    if (!currentUser) return false;
-    const role = currentUser.role;
+  const handleOpenNotifications = () => setShowNotifications(true);
 
-    // Rule 1: Notifications ONLY show to super_admin or admin
-    if (role !== 'super_admin' && role !== 'admin') return false;
-
-    // Rule 2: Self action check - users do NOT receive notifications of their own actions
-    if (log.userId === currentUser.id || log.userName === currentUser.name) return false;
-
-    // Rule 3: Super admin changes privacy - superadmin changes will NOT show to admin
-    if (role === 'admin') {
-      const actorRole = userRoleMap[log.userId] || log.userRole || log.details?._actor_role;
-      if (actorRole === 'super_admin') return false;
-    }
-
-    return true;
+  const handleNavigateToTicket = () => {
+    setShowNotifications(false);
+    setActivePage('tickets');
   };
 
-  // ─── Fetch notifications from activity_logs ───────────────────────────────
-  useEffect(() => {
-    if (!currentUser || (currentUser.role !== 'super_admin' && currentUser.role !== 'admin')) {
-      setNotifications([]);
-      setUnreadCount(0);
-      return;
-    }
-
-    let channel;
-
-    const fetchLogsAndUsers = async () => {
-      // Fetch users mapping to know roles
-      const { data: usersData } = await supabase.from('users').select('id, role');
-      const userRoleMap = {};
-      if (usersData) {
-        usersData.forEach(u => { userRoleMap[u.id] = u.role; });
-      }
-
-      const { data } = await supabase
-        .from('activity_logs')
-        .select('*')
-        .order('timestamp', { ascending: false })
-        .limit(30);
-
-      if (data) {
-        const mapped = data
-          .map(d => ({
-            id: d.id,
-            userId: d.user_id,
-            userRole: userRoleMap[d.user_id] || d.details?._actor_role,
-            userName: d.user_name,
-            userAvatar: d.user_avatar,
-            action: d.action,
-            recordAffected: d.record_affected,
-            moduleName: d.module_name,
-            rawTimestamp: d.timestamp,
-            details: d.details
-          }))
-          .filter(log => filterNotification(log, userRoleMap));
-
-        setNotifications(mapped);
-      }
-    };
-
-    fetchLogsAndUsers();
-
-    // Real-time subscription
-    channel = supabase
-      .channel('realtime_activity_logs')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'activity_logs' },
-        async (payload) => {
-          const r = payload.new;
-          
-          // Get role of creator if not in log
-          let actorRole = r.details?._actor_role;
-          if (!actorRole && r.user_id) {
-            const { data: uData } = await supabase.from('users').select('role').eq('id', r.user_id).single();
-            if (uData) actorRole = uData.role;
-          }
-
-          const newNotif = {
-            id: r.id,
-            userId: r.user_id,
-            userRole: actorRole,
-            userName: r.user_name,
-            userAvatar: r.user_avatar,
-            action: r.action,
-            recordAffected: r.record_affected,
-            moduleName: r.module_name,
-            rawTimestamp: r.timestamp,
-            details: r.details
-          };
-
-          // Apply notification visibility filter
-          if (filterNotification(newNotif, { [r.user_id]: actorRole })) {
-            setNotifications(prev => [newNotif, ...prev.slice(0, 19)]);
-            setUnreadCount(c => c + 1);
-            setToast({
-              type: 'info',
-              message: `⚡ ${r.user_name} ${r.action?.toLowerCase()} "${r.record_affected}" in ${r.module_name}`
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
-  }, [currentUser?.id, currentUser?.role]);
-
-  const handleOpenNotifications = () => {
-    setShowNotifications(true);
-    setUnreadCount(0);
-    // Mark all currently loaded as "read" by adding them to readIds
-    setReadIds(prev => {
-      const next = new Set(prev);
-      notifications.forEach(n => next.add(n.id));
-      return next;
-    });
+  const handleClearAll = async () => {
+    await clearAll?.();
   };
-
-  const handleMarkOneRead = (id) => {
-    setReadIds(prev => new Set([...prev, id]));
-  };
-
-  // Determine which notifs are "unread" = loaded via realtime (not in initial fetch)
-  // Simple heuristic: anything not yet in readIds is unread if unreadCount > 0
-  const isUnread = (notif, idx) => idx < unreadCount && !readIds.has(notif.id);
 
   return (
     <LayoutContext.Provider value={{ triggerExportModal, triggerImportModal, searchQuery, setSearchQuery, setToast }}>
@@ -434,36 +285,54 @@ export const Layout = ({ activePage, setActivePage, children }) => {
           <div style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             marginBottom: '1rem', paddingBottom: '0.875rem',
-            borderBottom: '1px solid var(--border-color)'
+            borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.5rem'
           }}>
             <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-              {notifications.length} recent activities
+              {(notifications || []).length} notification{(notifications || []).length === 1 ? '' : 's'}
             </span>
-            <button
-              onClick={() => {
-                setReadIds(prev => {
-                  const next = new Set(prev);
-                  notifications.forEach(n => next.add(n.id));
-                  return next;
-                });
-                setUnreadCount(0);
-              }}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: '0.8125rem', color: 'var(--color-primary)', fontWeight: 600,
-                display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px',
-                borderRadius: 'var(--radius-sm)', fontFamily: 'inherit'
-              }}
-              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-primary-light)'}
-              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-            >
-              <CheckCheck size={14} /> Mark all read
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <button
+                onClick={() => markAllRead?.()}
+                disabled={!unreadCount}
+                style={{
+                  background: 'none', border: 'none',
+                  cursor: unreadCount ? 'pointer' : 'not-allowed',
+                  fontSize: '0.8125rem',
+                  color: unreadCount ? 'var(--color-primary)' : 'var(--text-muted)',
+                  opacity: unreadCount ? 1 : 0.5,
+                  fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)', fontFamily: 'inherit'
+                }}
+                onMouseEnter={e => { if (unreadCount) e.currentTarget.style.backgroundColor = 'var(--color-primary-light)'; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <CheckCheck size={14} /> Mark all read
+              </button>
+              <button
+                onClick={() => setConfirmClearOpen(true)}
+                disabled={!(notifications || []).length}
+                style={{
+                  background: 'none', border: 'none',
+                  cursor: (notifications || []).length ? 'pointer' : 'not-allowed',
+                  fontSize: '0.8125rem',
+                  color: (notifications || []).length ? '#EF4444' : 'var(--text-muted)',
+                  opacity: (notifications || []).length ? 1 : 0.5,
+                  fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px',
+                  borderRadius: 'var(--radius-sm)', fontFamily: 'inherit'
+                }}
+                onMouseEnter={e => { if ((notifications || []).length) e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+              >
+                <Trash2 size={14} /> Clear
+              </button>
+            </div>
           </div>
 
           {/* Notification List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1, overflowY: 'auto' }}>
-            {notifications.length === 0 ? (
+            {!(notifications || []).length ? (
               <div style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 flex: 1, gap: '0.75rem', padding: '2rem', textAlign: 'center'
@@ -478,22 +347,34 @@ export const Layout = ({ activePage, setActivePage, children }) => {
                 </div>
                 <div>
                   <p style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>No notifications yet</p>
-                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Activities will appear here in real-time.</p>
+                  <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>New activity will appear here in real-time.</p>
                 </div>
               </div>
             ) : (
-              notifications.map((log, idx) => (
+              notifications.map((notif) => (
                 <NotificationCard
-                  key={log.id}
-                  log={log}
-                  isUnread={isUnread(log, idx)}
-                  onRead={handleMarkOneRead}
+                  key={notif.id}
+                  notif={notif}
+                  onRead={markAsRead}
+                  onNavigate={notif.ticket_id ? handleNavigateToTicket : undefined}
                 />
               ))
             )}
           </div>
         </div>
       </SlideOver>
+
+      {/* Clear Notifications Confirm */}
+      <ConfirmDialog
+        isOpen={confirmClearOpen}
+        onClose={() => setConfirmClearOpen(false)}
+        onConfirm={handleClearAll}
+        title="Clear Notifications"
+        headline="Clear all notifications?"
+        message="This permanently deletes every notification in your list. This can't be undone."
+        confirmText="Yes, Clear All"
+        confirmLoadingText="Clearing..."
+      />
 
       {/* ─── Export Modal ───────────────────────────────────────────────────── */}
       <ExportModal

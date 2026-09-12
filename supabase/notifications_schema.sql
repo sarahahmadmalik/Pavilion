@@ -20,6 +20,10 @@ DROP POLICY IF EXISTS "Users can update own notifications" ON public.notificatio
 CREATE POLICY "Users can update own notifications" ON public.notifications
     FOR UPDATE USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Users can delete own notifications" ON public.notifications;
+CREATE POLICY "Users can delete own notifications" ON public.notifications
+    FOR DELETE USING (user_id = auth.uid());
+
 -- Allow all authenticated users to insert (so a staff member's action can notify an admin)
 DROP POLICY IF EXISTS "Authenticated users can insert notifications" ON public.notifications;
 CREATE POLICY "Authenticated users can insert notifications" ON public.notifications

@@ -4,12 +4,16 @@ import {
   fetchGHMaintenance,
   createGHMaintenance,
   updateGHMaintenance,
-  deleteGHMaintenance
+  deleteGHMaintenance,
+  bulkDeleteRecords,
+  bulkUpdateFields
 } from '../lib/supabaseService.js';
+import { useSelection } from '../lib/useSelection.js';
 
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
+import { BulkActionBar } from '../components/common/BulkActionBar.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
 import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Wrench, X, Upload } from 'lucide-react';
@@ -100,6 +104,31 @@ export const GuestHouseMaintenance = (props) => {
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const { selected, toggle, toggleAll, isAllSelected, clear: clearSelection, count: selectedCount } = useSelection(paginatedItems.map(i => i.id));
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const { error } = await bulkDeleteRecords('guest_house_maintenance', Array.from(selected), currentUser, 'Guest House Maintenance');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} maintenance record(s) deleted.` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleBulkStatus = async (status) => {
+    const { error } = await bulkUpdateFields('guest_house_maintenance', Array.from(selected), { status }, currentUser, 'Guest House Maintenance');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} record(s) updated to "${status}".` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
 
   const handleOpenAdd = () => {
     setEditingItem(null);
@@ -293,6 +322,20 @@ export const GuestHouseMaintenance = (props) => {
         </div>
       </ResponsiveFilterBar>
 
+      {(canDelete || canEdit) && (
+        <BulkActionBar
+          count={selectedCount}
+          onClear={clearSelection}
+          onDelete={canDelete ? () => setConfirmBulkDeleteOpen(true) : undefined}
+          statusOptions={canEdit ? [
+            { label: 'Open', value: 'Open' },
+            { label: 'In Progress', value: 'In Progress' },
+            { label: 'Resolved', value: 'Resolved' }
+          ] : undefined}
+          onApplyStatus={handleBulkStatus}
+        />
+      )}
+
       {/* Data Table */}
       {loading ? (
         <TableLoader rows={6} cols={7} />
@@ -301,6 +344,11 @@ export const GuestHouseMaintenance = (props) => {
           <table className="data-table">
             <thead>
               <tr>
+                {(canDelete || canEdit) && (
+                  <th style={{ width: '36px' }}>
+                    <input type="checkbox" checked={isAllSelected} onChange={toggleAll} />
+                  </th>
+                )}
                 <th>Reported On</th>
                 <th>Issue Description</th>
                 <th>Status</th>
@@ -313,6 +361,11 @@ export const GuestHouseMaintenance = (props) => {
             <tbody>
               {paginatedItems.map((item) => (
                 <tr key={item.id}>
+                  {(canDelete || canEdit) && (
+                    <td>
+                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
+                    </td>
+                  )}
                   <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{item.reportedOn}</td>
                   <td>
                     <span style={{ fontWeight: 600, color: 'var(--text-main)', display: 'block' }}>{item.issue}</span>
@@ -487,6 +540,15 @@ export const GuestHouseMaintenance = (props) => {
         onConfirm={handleDelete}
         title="Delete Maintenance Record"
         message="Are you sure you want to delete this maintenance record?"
+      />
+
+      {/* Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Maintenance Records"
+        message={`Are you sure you want to delete ${selectedCount} selected record(s)? This cannot be undone.`}
       />
     </div>
   );

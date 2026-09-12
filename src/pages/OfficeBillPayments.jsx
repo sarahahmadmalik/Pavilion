@@ -4,12 +4,15 @@ import {
   fetchBillPayments,
   createBillPayment,
   updateBillPayment,
-  deleteBillPayment
+  deleteBillPayment,
+  bulkDeleteRecords
 } from '../lib/supabaseService.js';
+import { useSelection } from '../lib/useSelection.js';
 
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
+import { BulkActionBar } from '../components/common/BulkActionBar.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
 import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, CreditCard, X, Upload } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
@@ -49,7 +52,8 @@ export const OfficeBillPayments = (props) => {
     company: '',
     chequeNo: '',
     payee: '',
-    amount: 0
+    amount: 0,
+    notes: ''
   });
 
   // Confirm Delete State
@@ -95,6 +99,20 @@ export const OfficeBillPayments = (props) => {
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const { selected, toggle, toggleAll, isAllSelected, clear: clearSelection, count: selectedCount } = useSelection(paginatedItems.map(i => i.id));
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const { error } = await bulkDeleteRecords('office_bill_payments', Array.from(selected), currentUser, 'Office Bill Payments');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} bill payment record(s) deleted.` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingItem(null);
     setIsViewOnly(false);
@@ -103,7 +121,8 @@ export const OfficeBillPayments = (props) => {
       company: '',
       chequeNo: '',
       payee: '',
-      amount: ''
+      amount: '',
+      notes: ''
     });
     setIsSlideOpen(true);
   };
@@ -163,7 +182,8 @@ export const OfficeBillPayments = (props) => {
     { label: 'Company / Utility', key: 'company' },
     { label: 'Cheque No.', key: 'chequeNo' },
     { label: 'Payee Name', key: 'payee' },
-    { label: 'Amount (GHS)', key: 'amount' }
+    { label: 'Amount (GHS)', key: 'amount' },
+    { label: 'Notes', key: 'notes' }
   ];
 
   const resetFilters = () => {
@@ -267,6 +287,14 @@ export const OfficeBillPayments = (props) => {
         </div>
       </ResponsiveFilterBar>
 
+      {canDelete && (
+        <BulkActionBar
+          count={selectedCount}
+          onClear={clearSelection}
+          onDelete={() => setConfirmBulkDeleteOpen(true)}
+        />
+      )}
+
       {/* Data Table */}
       {loading ? (
         <TableLoader rows={6} cols={6} />
@@ -275,17 +303,28 @@ export const OfficeBillPayments = (props) => {
           <table className="data-table">
             <thead>
               <tr>
+                {canDelete && (
+                  <th style={{ width: '36px' }}>
+                    <input type="checkbox" checked={isAllSelected} onChange={toggleAll} />
+                  </th>
+                )}
                 <th>Disbursement Date</th>
                 <th>Company / Utility</th>
                 <th>Cheque No.</th>
                 <th>Payee Name</th>
                 <th>Amount (GHS)</th>
+                <th>Notes</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {paginatedItems.map((item) => (
                 <tr key={item.id}>
+                  {canDelete && (
+                    <td>
+                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
+                    </td>
+                  )}
                   <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{item.date}</td>
                   <td>
                     <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.company}</span>
@@ -298,6 +337,9 @@ export const OfficeBillPayments = (props) => {
                     <span style={{ fontWeight: 800, color: '#10B981', fontSize: '0.9375rem' }}>
                       GHS {Number(item.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                     </span>
+                  </td>
+                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {item.notes || '—'}
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.375rem' }}>
@@ -414,6 +456,20 @@ export const OfficeBillPayments = (props) => {
             />
           </div>
 
+          <div>
+            <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
+              Notes (Optional)
+            </label>
+            <textarea
+              rows={3}
+              disabled={isViewOnly}
+              className="input-control"
+              value={formData.notes || ''}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="e.g. Paid via mobile money"
+            />
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
             <button type="button" className="btn btn-secondary" onClick={() => setIsSlideOpen(false)}>
               {isViewOnly ? 'Close' : 'Cancel'}
@@ -434,6 +490,15 @@ export const OfficeBillPayments = (props) => {
         onConfirm={handleDelete}
         title="Delete Bill Payment Record"
         message="Are you sure you want to delete this payment record?"
+      />
+
+      {/* Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Bill Payment Records"
+        message={`Are you sure you want to delete ${selectedCount} selected record(s)? This cannot be undone.`}
       />
     </div>
   );

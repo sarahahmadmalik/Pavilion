@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase.js';
 import { useAuth } from './AuthContext.jsx';
-import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../lib/supabaseService.js';
+import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '../lib/supabaseService.js';
+import { playNotificationChime } from '../lib/notificationSound.js';
 
 const NotificationContext = createContext();
 
@@ -48,6 +49,7 @@ export const NotificationProvider = ({ children }) => {
             if (mounted) {
               setNotifications(prev => [payload.new, ...prev]);
               setUnreadCount(prev => prev + 1);
+              playNotificationChime();
             }
           }
         )
@@ -72,8 +74,15 @@ export const NotificationProvider = ({ children }) => {
     await markAllNotificationsAsRead();
   };
 
+  const clearAll = async () => {
+    if (!currentUser) return;
+    setNotifications([]);
+    setUnreadCount(0);
+    await clearAllNotifications(currentUser.id);
+  };
+
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllRead }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllRead, clearAll }}>
       {children}
     </NotificationContext.Provider>
   );

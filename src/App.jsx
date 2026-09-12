@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { Layout } from './components/layout/Layout.jsx';
 import { Login } from './pages/Login.jsx';
@@ -8,8 +9,9 @@ import { GuestList } from './pages/GuestList.jsx';
 import { GuestHouseMaintenance } from './pages/GuestHouseMaintenance.jsx';
 import { GuestHouseInventory } from './pages/GuestHouseInventory.jsx';
 import { OfficeBillPayments } from './pages/OfficeBillPayments.jsx';
-import { OfficeAssetList } from './pages/OfficeAssetList.jsx';
+import { VehicleMaintenance } from './pages/VehicleMaintenance.jsx';
 import { OfficeMaintenance } from './pages/OfficeMaintenance.jsx';
+import { Tickets } from './pages/Tickets.jsx';
 import { ActivityLog } from './pages/ActivityLog.jsx';
 import { UserManagement } from './pages/UserManagement.jsx';
 import { ProfileSettings } from './pages/ProfileSettings.jsx';
@@ -57,10 +59,10 @@ const MainContent = () => {
             <OfficeBillPayments />
           </ProtectedRoute>
         );
-      case 'office_assets':
+      case 'vehicles_maintenance':
         return (
-          <ProtectedRoute moduleKey="office_assets" moduleName="Office Asset List">
-            <OfficeAssetList />
+          <ProtectedRoute moduleKey="vehicles_maintenance" moduleName="Vehicles Maintenance">
+            <VehicleMaintenance />
           </ProtectedRoute>
         );
       case 'office_maintenance':
@@ -81,6 +83,8 @@ const MainContent = () => {
             <UserManagement />
           </ProtectedRoute>
         );
+      case 'tickets':
+        return <Tickets />;
       case 'profile':
         return <ProfileSettings />;
       default:
@@ -99,7 +103,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MainContent />
+        <NotificationProvider>
+          <MainContent />
+        </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -4,12 +4,15 @@ import {
   fetchGuests,
   createGuest,
   updateGuest,
-  deleteGuest
+  deleteGuest,
+  bulkDeleteRecords
 } from '../lib/supabaseService.js';
+import { useSelection } from '../lib/useSelection.js';
 
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
+import { BulkActionBar } from '../components/common/BulkActionBar.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
 import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Calendar, UserCheck, Filter, X, Upload } from 'lucide-react';
 import { Pagination } from '../components/common/Pagination.jsx';
@@ -98,6 +101,20 @@ export const GuestList = (props) => {
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  const { selected, toggle, toggleAll, isAllSelected, clear: clearSelection, count: selectedCount } = useSelection(paginatedItems.map(i => i.id));
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const { error } = await bulkDeleteRecords('guest_list', Array.from(selected), currentUser, 'Guest List');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} guest record(s) deleted.` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
 
   const [touched, setTouched] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -284,6 +301,15 @@ export const GuestList = (props) => {
         </div>
       </ResponsiveFilterBar>
 
+      {canDelete && (
+        <BulkActionBar
+          count={selectedCount}
+          onClear={clearSelection}
+          onDelete={() => setConfirmBulkDeleteOpen(true)}
+          deleteLabel="Delete Selected"
+        />
+      )}
+
       {/* Table Content */}
       {loading ? (
         <TableLoader rows={6} cols={6} />
@@ -292,6 +318,11 @@ export const GuestList = (props) => {
           <table className="data-table">
             <thead>
               <tr>
+                {canDelete && (
+                  <th style={{ width: '36px' }}>
+                    <input type="checkbox" checked={isAllSelected} onChange={toggleAll} />
+                  </th>
+                )}
                 <th>Guest Name</th>
                 <th>Check In</th>
                 <th>Check Out</th>
@@ -303,6 +334,11 @@ export const GuestList = (props) => {
             <tbody>
               {paginatedItems.map((item) => (
                 <tr key={item.id}>
+                  {canDelete && (
+                    <td>
+                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
+                    </td>
+                  )}
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                       <div style={{
@@ -484,6 +520,15 @@ export const GuestList = (props) => {
         onConfirm={handleDelete}
         title="Delete Guest Record"
         message={`Are you sure you want to delete the guest record for "${deletingName}"?`}
+      />
+
+      {/* Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Guest Records"
+        message={`Are you sure you want to delete ${selectedCount} selected guest record(s)? This cannot be undone.`}
       />
     </div>
   );

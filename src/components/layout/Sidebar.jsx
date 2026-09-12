@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import {
   LayoutDashboard,
   Users,
   Wrench,
   Package,
   CreditCard,
-  Barcode,
+  Car,
+  Ticket,
   ClipboardList,
   ShieldCheck,
   ChevronRight,
@@ -28,16 +30,23 @@ export const Sidebar = ({
   setIsMobileOpen
 }) => {
   const { currentUser, hasModulePermission, logout } = useAuth();
+  const { notifications } = useNotifications() || {};
   const [logoHovered, setLogoHovered] = useState(false);
 
-  const menuItems = [
+  const ticketUnreadCount = (notifications || []).filter(n => n.ticket_id && !n.is_read).length;
+
+  const mainItems = [
     { key: 'dashboard',          label: 'Dashboard',            icon: LayoutDashboard, permission: true },
     { key: 'guest_list',         label: 'Guest List',           icon: Users,           permission: hasModulePermission('guest_list') },
     { key: 'gh_maintenance',     label: 'GH Maintenance',       icon: Wrench,          permission: hasModulePermission('gh_maintenance') },
     { key: 'gh_inventory',       label: 'GH Inventory',         icon: Package,         permission: hasModulePermission('gh_inventory') },
     { key: 'office_bills',       label: 'Office Bill Payments', icon: CreditCard,      permission: hasModulePermission('office_bills') },
-    { key: 'office_assets',      label: 'Office Assets',        icon: Barcode,         permission: hasModulePermission('office_assets') },
-    { key: 'office_maintenance', label: 'Office Maintenance',   icon: Wrench,          permission: hasModulePermission('office_maintenance') },
+    { key: 'vehicles_maintenance',label: 'Vehicles Maint',       icon: Car,             permission: hasModulePermission('vehicles_maintenance') },
+    { key: 'office_maintenance', label: 'Office Maintenance',   icon: Wrench,          permission: hasModulePermission('office_maintenance') }
+  ];
+
+  const managementItems = [
+    { key: 'tickets',            label: 'Tickets',              icon: Ticket,          permission: true, badge: ticketUnreadCount },
     { key: 'activity_log',       label: 'Activity Log',         icon: ClipboardList,   permission: currentUser?.role !== 'staff' },
     { key: 'user_management',    label: 'User Management',      icon: ShieldCheck,     permission: currentUser?.role === 'super_admin' }
   ];
@@ -45,6 +54,87 @@ export const Sidebar = ({
   const handleNavClick = (key) => {
     setActivePage(key);
     if (isMobileOpen) setIsMobileOpen(false);
+  };
+
+  const renderNavItem = (item) => {
+    if (!item.permission) return null;
+    const Icon = item.icon;
+    const isActive = activePage === item.key;
+
+    return (
+      <button
+        key={item.key}
+        onClick={() => handleNavClick(item.key)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.8125rem',
+          padding: isCollapsed ? '0.75rem 0' : '0.625rem 0.875rem',
+          borderRadius: '9px',
+          backgroundColor: isActive ? ACTIVE_BG : 'transparent',
+          color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
+          fontWeight: isActive ? 600 : 400,
+          fontSize: '0.875rem',
+          border: 'none',
+          cursor: 'pointer',
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          transition: 'background-color 0.14s ease, color 0.14s ease',
+          whiteSpace: 'nowrap',
+          letterSpacing: '0.01em',
+          fontFamily: 'inherit',
+          position: 'relative'
+        }}
+        onMouseEnter={e => {
+          if (!isActive) {
+            e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.045)';
+            e.currentTarget.style.color = '#9AAEC8';
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isActive) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.color = INACTIVE_COLOR;
+          }
+        }}
+        title={isCollapsed ? item.label : undefined}
+      >
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <Icon
+            size={20}
+            strokeWidth={isActive ? 2.2 : 1.6}
+            color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
+          />
+          {!!item.badge && (
+            <span style={{
+              position: 'absolute',
+              top: isCollapsed ? '-4px' : '-5px',
+              right: isCollapsed ? '-6px' : '-7px',
+              minWidth: '15px',
+              height: '15px',
+              padding: '0 3px',
+              borderRadius: '50%',
+              backgroundColor: '#EF4444',
+              color: '#fff',
+              fontSize: '0.5625rem',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              lineHeight: 1,
+              border: '1.5px solid var(--bg-sidebar)'
+            }}>
+              {item.badge > 9 ? '9+' : item.badge}
+            </span>
+          )}
+        </div>
+        {!isCollapsed && (
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
+            {item.label}
+          </span>
+        )}
+      </button>
+    );
   };
 
   const handleSignOut = () => {
@@ -238,62 +328,33 @@ export const Sidebar = ({
           flexDirection: 'column',
           gap: '4px'
         }}>
-          {menuItems.map((item) => {
-            if (!item.permission) return null;
-            const Icon = item.icon;
-            const isActive = activePage === item.key;
+          {mainItems.map(renderNavItem)}
 
-            return (
-              <button
-                key={item.key}
-                onClick={() => handleNavClick(item.key)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.8125rem',
-                  padding: isCollapsed ? '0.75rem 0' : '0.625rem 0.875rem',
-                  borderRadius: '9px',
-                  backgroundColor: isActive ? ACTIVE_BG : 'transparent',
-                  color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
-                  fontWeight: isActive ? 600 : 400,
-                  fontSize: '0.875rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  justifyContent: isCollapsed ? 'center' : 'flex-start',
-                  transition: 'background-color 0.14s ease, color 0.14s ease',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '0.01em',
-                  fontFamily: 'inherit'
-                }}
-                onMouseEnter={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.045)';
-                    e.currentTarget.style.color = '#9AAEC8';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.color = INACTIVE_COLOR;
-                  }
-                }}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <Icon
-                  size={20}
-                  strokeWidth={isActive ? 2.2 : 1.6}
-                  color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
-                  style={{ flexShrink: 0 }}
-                />
-                {!isCollapsed && (
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                    {item.label}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {/* Section divider — Management */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            margin: isCollapsed ? '0.75rem 0 0.25rem' : '1rem 0.25rem 0.25rem',
+            flexShrink: 0
+          }}>
+            <div style={{ flex: isCollapsed ? '1' : '0 0 12px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+            {!isCollapsed && (
+              <span style={{
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                color: '#4B5773',
+                whiteSpace: 'nowrap'
+              }}>
+                Management
+              </span>
+            )}
+            <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+          </div>
+
+          {managementItems.map(renderNavItem)}
         </nav>
 
         {/* ── Sign Out ── */}

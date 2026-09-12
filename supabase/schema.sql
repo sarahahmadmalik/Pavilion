@@ -63,6 +63,8 @@ CREATE TABLE IF NOT EXISTS public.guest_house_inventory (
     qty INTEGER NOT NULL DEFAULT 1,
     condition inventory_condition NOT NULL DEFAULT 'Good',
     location VARCHAR(100) NOT NULL,
+    serial_number VARCHAR(100),
+    cost NUMERIC(12, 2) DEFAULT 0.00,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -75,15 +77,19 @@ CREATE TABLE IF NOT EXISTS public.office_bill_payments (
     cheque_no VARCHAR(100) NOT NULL,
     payee VARCHAR(255) NOT NULL,
     amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS public.office_assets (
+CREATE TABLE IF NOT EXISTS public.vehicles_maintenance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    barcode VARCHAR(100) UNIQUE NOT NULL,
-    description TEXT NOT NULL,
-    status asset_status NOT NULL DEFAULT 'In Use',
-    location VARCHAR(100) NOT NULL,
+    reported_on DATE NOT NULL DEFAULT CURRENT_DATE,
+    vehicle_name VARCHAR(255) NOT NULL,
+    issue TEXT NOT NULL,
+    status maintenance_status NOT NULL DEFAULT 'Open',
+    updates TEXT,
+    name_of_worker VARCHAR(255),
+    cost NUMERIC(12, 2) DEFAULT 0.00,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -119,6 +125,6 @@ ALTER TABLE public.guest_list ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guest_house_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.guest_house_inventory ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.office_bill_payments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.office_assets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.vehicles_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.office_maintenance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;

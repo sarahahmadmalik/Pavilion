@@ -9,7 +9,7 @@ TRUNCATE TABLE public.guest_list CASCADE;
 TRUNCATE TABLE public.guest_house_maintenance CASCADE;
 TRUNCATE TABLE public.guest_house_inventory CASCADE;
 TRUNCATE TABLE public.office_bill_payments CASCADE;
-TRUNCATE TABLE public.office_assets CASCADE;
+TRUNCATE TABLE public.vehicles_maintenance CASCADE;
 TRUNCATE TABLE public.office_maintenance CASCADE;
 
 -- 3. FIX POLICIES
@@ -28,8 +28,8 @@ CREATE POLICY "Allow authenticated read/write on guest_house_inventory" ON publi
 DROP POLICY IF EXISTS "Allow authenticated read/write on office_bill_payments" ON public.office_bill_payments;
 CREATE POLICY "Allow authenticated read/write on office_bill_payments" ON public.office_bill_payments FOR ALL USING (true);
 
-DROP POLICY IF EXISTS "Allow authenticated read/write on office_assets" ON public.office_assets;
-CREATE POLICY "Allow authenticated read/write on office_assets" ON public.office_assets FOR ALL USING (true);
+DROP POLICY IF EXISTS "Allow authenticated read/write on vehicles_maintenance" ON public.vehicles_maintenance;
+CREATE POLICY "Allow authenticated read/write on vehicles_maintenance" ON public.vehicles_maintenance FOR ALL USING (true);
 
 DROP POLICY IF EXISTS "Allow authenticated read/write on office_maintenance" ON public.office_maintenance;
 CREATE POLICY "Allow authenticated read/write on office_maintenance" ON public.office_maintenance FOR ALL USING (true);

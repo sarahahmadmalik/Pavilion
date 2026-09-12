@@ -4,12 +4,16 @@ import {
   fetchGHInventory,
   createGHInventory,
   updateGHInventory,
-  deleteGHInventory
+  deleteGHInventory,
+  bulkDeleteRecords,
+  bulkUpdateFields
 } from '../lib/supabaseService.js';
+import { useSelection } from '../lib/useSelection.js';
 
 import { SlideOver } from '../components/common/SlideOver.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
+import { BulkActionBar } from '../components/common/BulkActionBar.jsx';
 import { StatusBadge } from '../components/common/StatusBadge.jsx';
 import { AccessDenied } from './AccessDenied.jsx';
 import { Plus, Search, FileSpreadsheet, Edit, Trash2, Eye, Package, X, Upload } from 'lucide-react';
@@ -49,6 +53,8 @@ export const GuestHouseInventory = (props) => {
     qty: 1,
     condition: 'Good',
     location: '',
+    serialNumber: '',
+    cost: '',
     notes: ''
   });
 
@@ -94,6 +100,31 @@ export const GuestHouseInventory = (props) => {
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage) || 1;
   const paginatedItems = filteredItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
+  const { selected, toggle, toggleAll, isAllSelected, clear: clearSelection, count: selectedCount } = useSelection(paginatedItems.map(i => i.id));
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+
+  const handleBulkDelete = async () => {
+    const { error } = await bulkDeleteRecords('guest_house_inventory', Array.from(selected), currentUser, 'Guest House Inventory');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} inventory item(s) deleted.` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleBulkCondition = async (condition) => {
+    const { error } = await bulkUpdateFields('guest_house_inventory', Array.from(selected), { condition }, currentUser, 'Guest House Inventory');
+    if (!error) {
+      setToast?.({ type: 'success', message: `${selectedCount} item(s) updated to "${condition}".` });
+      clearSelection();
+      loadData();
+    } else {
+      setToast?.({ type: 'error', message: error.message });
+    }
+  };
+
   const handleOpenAdd = () => {
     setEditingItem(null);
     setIsViewOnly(false);
@@ -102,6 +133,8 @@ export const GuestHouseInventory = (props) => {
       qty: '',
       condition: 'Good',
       location: '',
+      serialNumber: '',
+      cost: '',
       notes: ''
     });
     setIsSlideOpen(true);
@@ -162,6 +195,8 @@ export const GuestHouseInventory = (props) => {
     { label: 'Quantity', key: 'qty' },
     { label: 'Condition', key: 'condition' },
     { label: 'Location', key: 'location' },
+    { label: 'Serial Number', key: 'serialNumber' },
+    { label: 'Cost (GHS)', key: 'cost' },
     { label: 'Notes', key: 'notes' }
   ];
 
@@ -260,6 +295,21 @@ export const GuestHouseInventory = (props) => {
         </div>
       </ResponsiveFilterBar>
 
+      {(canDelete || canEdit) && (
+        <BulkActionBar
+          count={selectedCount}
+          onClear={clearSelection}
+          onDelete={canDelete ? () => setConfirmBulkDeleteOpen(true) : undefined}
+          statusOptions={canEdit ? [
+            { label: 'Good', value: 'Good' },
+            { label: 'Fair', value: 'Fair' },
+            { label: 'Damaged', value: 'Damaged' }
+          ] : undefined}
+          statusPlaceholder="Set condition..."
+          onApplyStatus={handleBulkCondition}
+        />
+      )}
+
       {/* Data Table */}
       {loading ? (
         <TableLoader rows={6} cols={6} />
@@ -268,10 +318,17 @@ export const GuestHouseInventory = (props) => {
           <table className="data-table">
             <thead>
               <tr>
+                {(canDelete || canEdit) && (
+                  <th style={{ width: '36px' }}>
+                    <input type="checkbox" checked={isAllSelected} onChange={toggleAll} />
+                  </th>
+                )}
                 <th>Item Name</th>
                 <th>Qty</th>
                 <th>Condition</th>
                 <th>Storage / Room Location</th>
+                <th>Serial No.</th>
+                <th>Cost (GHS)</th>
                 <th>Notes</th>
                 <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
@@ -279,6 +336,11 @@ export const GuestHouseInventory = (props) => {
             <tbody>
               {paginatedItems.map((item) => (
                 <tr key={item.id}>
+                  {(canDelete || canEdit) && (
+                    <td>
+                      <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} />
+                    </td>
+                  )}
                   <td>
                     <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{item.item}</span>
                   </td>
@@ -287,8 +349,10 @@ export const GuestHouseInventory = (props) => {
                   </td>
                   <td><StatusBadge status={item.condition} /></td>
                   <td style={{ fontSize: '0.8125rem', color: 'var(--text-main)' }}>{item.location}</td>
+                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{item.serialNumber || 'N/A'}</td>
+                  <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{item.cost ? `GH₵ ${Number(item.cost).toFixed(2)}` : 'N/A'}</td>
                   <td style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.notes || '�'}
+                    {item.notes || '—'}
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.375rem' }}>
@@ -395,6 +459,37 @@ export const GuestHouseInventory = (props) => {
             />
           </div>
 
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
+                Serial Number
+              </label>
+              <input
+                type="text"
+                disabled={isViewOnly}
+                className="input-control"
+                value={formData.serialNumber || ''}
+                onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+                placeholder="e.g. SN-12345"
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
+                Cost (GHS)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                disabled={isViewOnly}
+                className="input-control"
+                value={formData.cost === 0 ? '' : formData.cost}
+                onChange={(e) => setFormData({ ...formData, cost: parseFloat(e.target.value) || 0 })}
+                placeholder="e.g. 150.00"
+              />
+            </div>
+          </div>
+
           <div>
             <label style={{ display: 'block', fontSize: '0.8125rem', fontWeight: 600, marginBottom: '0.375rem' }}>
               Notes / Description
@@ -429,6 +524,15 @@ export const GuestHouseInventory = (props) => {
         onConfirm={handleDelete}
         title="Delete Inventory Item"
         message="Are you sure you want to delete this inventory item?"
+      />
+
+      {/* Bulk Delete Dialog */}
+      <ConfirmDialog
+        isOpen={confirmBulkDeleteOpen}
+        onClose={() => setConfirmBulkDeleteOpen(false)}
+        onConfirm={handleBulkDelete}
+        title="Delete Inventory Items"
+        message={`Are you sure you want to delete ${selectedCount} selected item(s)? This cannot be undone.`}
       />
     </div>
   );

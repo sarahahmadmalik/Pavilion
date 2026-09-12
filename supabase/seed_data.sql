@@ -239,6 +239,20 @@ INSERT INTO public.guest_list (name, check_in, check_out, country, room_allocate
 ('Wasim Akram', '2026-08-10', '2026-08-22', 'Pakistan', 'VIP Suite 108', 'Press & Media Relations'),
 ('Abdul Razzaq', '2026-08-11', '2026-08-24', 'Pakistan', 'Room 209', 'Solar Power Installation Oversight'),
 ('Azhar Mahmood', '2026-08-12', '2026-08-25', 'Pakistan', 'Room 210', 'Financial Audit & Accounts Review');
+('Danish Iqbal', '2026-08-06', '2026-08-09', 'Pakistan', 'Room 201', 'Broadcasting Engineering Review'),
+('Tariq Mehmood', '2026-07-20', '2026-07-30', 'Pakistan', 'Room 103', 'IT Infrastructure Upgrade'),
+('Rashid Minhas', '2026-07-22', '2026-08-02', 'Pakistan', 'Room 108', 'Satellite Uplink Maintenance'),
+('Shahid Afridi', '2026-07-25', '2026-08-05', 'Pakistan', 'VIP Suite 104', 'Youth & Cultural Program Delegation'),
+('Imran Nazir', '2026-07-27', '2026-08-06', 'Pakistan', 'Room 206', 'Audio Engineering Workshop'),
+('Kamran Akmal', '2026-08-01', '2026-08-11', 'Pakistan', 'Room 208', 'Security Audit & Safety Assessment'),
+('Shoaib Malik', '2026-08-03', '2026-08-14', 'Pakistan', 'VIP Suite 105', 'Humanitarian Relief Planning'),
+('Younis Khan', '2026-08-05', '2026-08-16', 'Pakistan', 'VIP Suite 106', 'Regional Administrative Summit'),
+('Saeed Anwar', '2026-08-07', '2026-08-18', 'Pakistan', 'Room 102', 'Educational Curriculum Development'),
+('Inzamam ul Haq', '2026-08-08', '2026-08-20', 'Pakistan', 'VIP Suite 107', 'Interfaith Harmony Conference'),
+('Waqar Younis', '2026-08-09', '2026-08-21', 'Pakistan', 'Room 107', 'Transmission Tower Inspection'),
+('Wasim Akram', '2026-08-10', '2026-08-22', 'Pakistan', 'VIP Suite 108', 'Press & Media Relations'),
+('Abdul Razzaq', '2026-08-11', '2026-08-24', 'Pakistan', 'Room 209', 'Solar Power Installation Oversight'),
+('Azhar Mahmood', '2026-08-12', '2026-08-25', 'Pakistan', 'Room 210', 'Financial Audit & Accounts Review');
 
 -- Guest House Maintenance
 INSERT INTO public.guest_house_maintenance (reported_on, issue, status, updates, location, name_of_worker, cost) VALUES

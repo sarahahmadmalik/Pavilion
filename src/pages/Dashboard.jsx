@@ -193,7 +193,9 @@ export const Dashboard = ({ setActivePage }) => {
   const activeVendorsCount = data.vendors.filter(v => v.status === 'Active').length;
   const onDutyStaffCount = data.staff.filter(s => s.status === 'On Duty' || s.status === 'In Field').length;
 
-  const role = currentUser?.role || 'staff';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin';
+  const isStaff = role === 'staff';
   const firstName = currentUser?.name?.split(' ')[0] || 'User';
   const isAdminOrSuper = role === 'admin' || role === 'super_admin';
 
@@ -350,7 +352,7 @@ export const Dashboard = ({ setActivePage }) => {
       badgeColor: 'var(--status-red-text)',
       page: 'gh_maintenance'
     }] : []),
-    ...(openTicketsCount > 0 ? [{
+    ...(!isStaff && openTicketsCount > 0 ? [{
       label: `${openTicketsCount} Unresolved Support Ticket${openTicketsCount > 1 ? 's' : ''}`,
       detail: 'Awaiting response or resolution from operations team',
       badge: 'Action',
@@ -366,7 +368,7 @@ export const Dashboard = ({ setActivePage }) => {
       badgeColor: 'var(--status-blue-text)',
       page: 'room_occupancy'
     }] : []),
-    ...((data.vendors.filter(v => v.status === 'Under Review').length > 0) ? [{
+    ...(isSuperAdmin && (data.vendors.filter(v => v.status === 'Under Review').length > 0) ? [{
       label: `${data.vendors.filter(v => v.status === 'Under Review').length} Vendor Contract${data.vendors.filter(v => v.status === 'Under Review').length > 1 ? 's' : ''} Under Review`,
       detail: 'Pending SLA evaluation or renewal sign-off',
       badge: 'Governance',
@@ -503,9 +505,9 @@ export const Dashboard = ({ setActivePage }) => {
         </div>
       </div>
 
-      {/* ─── Row 3: Utility & Vendor Bill Disbursements + Recent Activity ───── */}
+      {/* ─── Row 3: Utility & Vendor Bill Disbursements (Admin/Super Admin) + Recent Activity ───── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
-        {hasModulePermission('office_bills') && (
+        {!isStaff && hasModulePermission('office_bills') && (
           <div style={{
             padding: '1.25rem', borderRadius: 'var(--radius-lg)',
             backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
@@ -598,35 +600,37 @@ export const Dashboard = ({ setActivePage }) => {
         </div>
       </div>
 
-      {/* ─── Row 4: Operations Health + Platform Modules Overview ────────────── */}
+      {/* ─── Row 4: Role-Scoped Platform Modules Overview ──────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
-        {/* Occupancy & Project Progress Bars */}
-        <div style={{
-          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.9rem'
-        }}>
-          <div>
-            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Operations Health</h4>
-            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Live capacity &amp; execution metrics</p>
-          </div>
-
-          {[
-            { label: 'Guest House Occupancy', pct: occupancyPct, meta: `${occupiedRoomsCount}/${data.rooms.length} suites`, color: '#1A3FA0' },
-            { label: 'Maintenance Resolution', pct: allMaintenance.length ? Math.round((resolvedCount / allMaintenance.length) * 100) : 100, meta: `${resolvedCount}/${allMaintenance.length} resolved`, color: '#10B981' },
-            { label: 'Project Completion', pct: data.projects.length ? Math.round(((data.projects.length - activeProjectsCount) / data.projects.length) * 100) : 0, meta: `${data.projects.length - activeProjectsCount}/${data.projects.length} completed`, color: '#3B82F6' }
-          ].map(bar => (
-            <div key={bar.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{bar.label}</span>
-                <span style={{ color: 'var(--text-muted)' }}>{bar.meta} ({bar.pct}%)</span>
-              </div>
-              <div style={{ height: '7px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                <div style={{ width: `${bar.pct}%`, height: '100%', backgroundColor: bar.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
-              </div>
+        {/* Operations Health — Admin & Super Admin only */}
+        {!isStaff && (
+          <div style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.9rem'
+          }}>
+            <div>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Operations Health</h4>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Live capacity &amp; execution metrics</p>
             </div>
-          ))}
-        </div>
+
+            {[
+              { label: 'Guest House Occupancy', pct: occupancyPct, meta: `${occupiedRoomsCount}/${data.rooms.length} suites`, color: '#1A3FA0' },
+              { label: 'Maintenance Resolution', pct: allMaintenance.length ? Math.round((resolvedCount / allMaintenance.length) * 100) : 100, meta: `${resolvedCount}/${allMaintenance.length} resolved`, color: '#10B981' },
+              { label: 'Project Completion', pct: data.projects.length ? Math.round(((data.projects.length - activeProjectsCount) / data.projects.length) * 100) : 0, meta: `${data.projects.length - activeProjectsCount}/${data.projects.length} completed`, color: '#3B82F6' }
+            ].map(bar => (
+              <div key={bar.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{bar.label}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{bar.meta} ({bar.pct}%)</span>
+                </div>
+                <div style={{ height: '7px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                  <div style={{ width: `${bar.pct}%`, height: '100%', backgroundColor: bar.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {/* Upcoming Community Events */}
         <div
           onClick={() => setActivePage('community_events')}
@@ -688,35 +692,37 @@ export const Dashboard = ({ setActivePage }) => {
           )}
         </div>
 
-        {/* Vendors, Staff & Governance Vault */}
-        <div
-          style={{
-            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
-            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
-            boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.65rem'
-          }}
-        >
-          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Community &amp; Governance</h4>
-          {[
-            { label: 'Preferred Vendors', value: `${activeVendorsCount} Active`, page: 'vendors' },
-            { label: 'Community Staff', value: `${onDutyStaffCount} On Duty / Field`, page: 'staff_directory' },
-            { label: 'Policy & SOP Vault', value: `${data.documents.length} Documents`, page: 'documents' }
-          ].map(row => (
-            <button
-              key={row.label}
-              type="button"
-              onClick={() => setActivePage(row.page)}
-              style={{
-                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-md)',
-                border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-page)', cursor: 'pointer'
-              }}
-            >
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{row.label}</span>
-              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary)' }}>{row.value}</span>
-            </button>
-          ))}
-        </div>
+        {/* Vendors, Staff & Governance Vault — Super Admin only */}
+        {isSuperAdmin && (
+          <div
+            style={{
+              padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+              boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.65rem'
+            }}
+          >
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Community &amp; Governance</h4>
+            {[
+              { label: 'Preferred Vendors', value: `${activeVendorsCount} Active`, page: 'vendors' },
+              { label: 'Community Staff', value: `${onDutyStaffCount} On Duty / Field`, page: 'staff_directory' },
+              { label: 'Policy & SOP Vault', value: `${data.documents.length} Documents`, page: 'documents' }
+            ].map(row => (
+              <button
+                key={row.label}
+                type="button"
+                onClick={() => setActivePage(row.page)}
+                style={{
+                  width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-page)', cursor: 'pointer'
+                }}
+              >
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{row.label}</span>
+                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary)' }}>{row.value}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

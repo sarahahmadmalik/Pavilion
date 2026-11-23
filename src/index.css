@@ -479,6 +479,12 @@ input, select, textarea, button {
 .header-mobile-hamburger {
   display: none !important;
 }
+.mobile-search-trigger {
+  display: none !important;
+}
+.desktop-search-bar {
+  display: block;
+}
 .mobile-only-btn {
   display: none !important;
 }
@@ -519,6 +525,15 @@ html, body, #root {
 
 /* Mobile View (Max Width 768px) */
 @media (max-width: 768px) {
+  .app-header {
+    padding: 0 0.75rem !important;
+  }
+  .desktop-search-bar {
+    display: none !important;
+  }
+  .mobile-search-trigger {
+    display: inline-flex !important;
+  }
   .header-mobile-hamburger {
     display: inline-flex !important;
   }

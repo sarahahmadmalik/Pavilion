@@ -114,7 +114,7 @@ function Highlight({ text, query }) {
 }
 
 // ─── Main Search Bar Component ────────────────────────────────────────────────
-export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) => {
+export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage, inModal = false, onCloseModal }) => {
   const [inputValue, setInputValue] = useState(searchQuery || '');
   const [results, setResults] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -125,8 +125,15 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
+  useEffect(() => {
+    if (inModal) {
+      setTimeout(() => inputRef.current?.focus(), 60);
+    }
+  }, [inModal]);
+
   // Close dropdown on outside click
   useEffect(() => {
+    if (inModal) return;
     const handler = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
         setIsOpen(false);
@@ -134,7 +141,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, []);
+  }, [inModal]);
 
   // Comprehensive parallel search across all database tables
   const doSearch = useCallback(async (q) => {
@@ -206,6 +213,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
     if (result.module?.key) {
       setActivePage(result.module.key);
     }
+    onCloseModal?.();
   };
 
   const handleClear = () => {
@@ -247,7 +255,7 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
   });
 
   return (
-    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', maxWidth: '360px' }}>
+    <div ref={wrapperRef} style={{ position: 'relative', width: '100%', maxWidth: inModal ? '100%' : '360px' }}>
       {/* Search Input Box */}
       <div style={{ position: 'relative' }}>
         <Search
@@ -287,9 +295,16 @@ export const GlobalSearchBar = ({ searchQuery, setSearchQuery, setActivePage }) 
         )}
       </div>
 
-      {/* Global Live Results Dropdown */}
-      {isOpen && (
-        <div style={{
+      {/* Global Live Results Dropdown / Modal Body */}
+      {(isOpen || (inModal && inputValue.trim().length > 0)) && (
+        <div style={inModal ? {
+          marginTop: '0.75rem',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-md)',
+          maxHeight: '55vh',
+          overflowY: 'auto'
+        } : {
           position: 'absolute',
           top: 'calc(100% + 6px)',
           left: 0,

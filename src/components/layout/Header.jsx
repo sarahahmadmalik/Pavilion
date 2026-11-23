@@ -7,6 +7,7 @@ import {
   Moon,
   Bell,
   MessageSquare,
+  Search,
   User,
   Users,
   LogOut,
@@ -24,6 +25,7 @@ import {
 import { GlobalSearchBar } from './GlobalSearchBar.jsx';
 import { UserAvatar } from '../common/UserAvatar.jsx';
 import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
+import { Modal } from '../common/Modal.jsx';
 import { DEMO_ACCOUNTS } from '../../lib/demoAccounts.js';
 
 const ROLE_LABELS = {
@@ -44,12 +46,14 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
   const { chatUnreadCount = 0 } = useNotifications() || {};
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const [showDemoList, setShowDemoList] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
   const [switchingDemo, setSwitchingDemo] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const handleSwitchDemoUser = async (acc) => {
-    setShowDemoMenu(false);
+    setShowDemoList(false);
+    setShowProfileMenu(false);
     if (acc.email === currentUser?.email) return;
     setSwitchingDemo(true);
     await login(acc.email, acc.password);
@@ -60,7 +64,7 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       height: '68px',
       minHeight: '68px',
       flexShrink: 0,
@@ -74,25 +78,25 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
       position: 'sticky',
       top: 0,
       zIndex: 90,
-      gap: '0.75rem',
+      gap: '0.5rem',
       transition: 'background-color var(--transition-normal)'
     }}>
 
-      {/* ─── Left: Mobile Hamburger + Welcome / Global Search Bar ─────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, minWidth: 0 }}>
+      {/* ─── Left: Mobile Hamburger + Desktop Search Bar ─────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, minWidth: 0 }}>
 
         {/* Mobile Hamburger */}
         <button
           onClick={onToggleMobileSidebar}
           className="btn btn-ghost header-mobile-hamburger"
-          style={{ padding: '0.5rem', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
+          style={{ padding: '0.45rem', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}
           title="Open Menu"
         >
           <Menu size={22} color="var(--text-main)" />
         </button>
 
-        {/* Global Search Bar */}
-        <div style={{ flex: 1, maxWidth: '360px', minWidth: '120px' }}>
+        {/* Global Search Bar — Desktop / Tablet (> 768px) */}
+        <div className="desktop-search-bar" style={{ flex: 1, maxWidth: '360px', minWidth: '120px' }}>
           <GlobalSearchBar
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
@@ -101,8 +105,8 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
         </div>
       </div>
 
-      {/* ─── Right: Theme Toggle + Notifications + Profile ────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
+      {/* ─── Right: Mobile Search Icon + Theme Toggle + Chat + Notifications + Profile ─── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}>
         <style>{`
           @keyframes notifPulseRing {
             0% { transform: scale(1); opacity: 0.55; }
@@ -111,67 +115,17 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
           }
         `}</style>
 
-        {/* Demo User Quick-Switch Button — right beside Theme Toggle */}
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            disabled={switchingDemo}
-            onClick={() => setShowDemoMenu(!showDemoMenu)}
-            className="btn btn-ghost btn-sm"
-            style={{
-              padding: '0.35rem 0.65rem',
-              borderRadius: 'var(--radius-full)',
-              border: '1px solid var(--border-color)',
-              fontSize: '0.75rem',
-              gap: '0.35rem'
-            }}
-            title="Switch Demo User"
-          >
-            <Users size={14} color="var(--color-primary)" />
-            <span>Demo</span>
-          </button>
-
-          <AnimatedDropdown
-            isOpen={showDemoMenu}
-            onClose={() => setShowDemoMenu(false)}
-            width="245px"
-            align="right"
-          >
-            <div style={{ padding: '0.45rem 0.75rem', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
-              Switch Demo User
-            </div>
-            {DEMO_ACCOUNTS.map(acc => {
-              const isCurrent = acc.email === currentUser?.email;
-              return (
-                <button
-                  key={acc.email}
-                  type="button"
-                  onClick={() => handleSwitchDemoUser(acc)}
-                  className="btn btn-ghost btn-sm"
-                  style={{
-                    width: '100%',
-                    justifyContent: 'space-between',
-                    padding: '0.5rem 0.75rem',
-                    borderRadius: '6px',
-                    backgroundColor: isCurrent ? 'var(--color-primary-light)' : 'transparent'
-                  }}
-                >
-                  <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{acc.name}</span>
-                  <span style={{
-                    fontSize: '0.65rem',
-                    fontWeight: 700,
-                    padding: '2px 7px',
-                    borderRadius: '999px',
-                    backgroundColor: acc.role === 'super_admin' ? 'var(--color-primary-light)' : acc.role === 'admin' ? 'var(--status-blue-bg)' : 'var(--status-green-bg)',
-                    color: acc.role === 'super_admin' ? 'var(--color-primary)' : acc.role === 'admin' ? 'var(--status-blue-text)' : 'var(--status-green-text)'
-                  }}>
-                    {acc.roleLabel}
-                  </span>
-                </button>
-              );
-            })}
-          </AnimatedDropdown>
-        </div>
+        {/* Mobile Search Icon Trigger — opens Global Search Modal */}
+        <button
+          type="button"
+          onClick={() => setShowSearchModal(true)}
+          className="btn btn-ghost mobile-search-trigger"
+          style={{ padding: '0.5rem', borderRadius: '50%' }}
+          title="Search"
+          aria-label="Search"
+        >
+          <Search size={18} color="var(--text-muted)" />
+        </button>
 
         {/* Theme Toggle Button — visible on desktop / tablet (>768px) */}
         <button
@@ -378,6 +332,80 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
 
             <DropdownDivider />
 
+            {/* Switch Demo User inside Profile Dropdown */}
+            <button
+              type="button"
+              onClick={() => setShowDemoList(prev => !prev)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '0.55rem 0.875rem',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-main)',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                fontFamily: 'inherit',
+                borderRadius: '6px'
+              }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--bg-card-hover)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
+                <Users size={16} color="var(--color-primary)" />
+                <span>Switch Demo User</span>
+              </span>
+              <ChevronDown
+                size={14}
+                color="var(--text-muted)"
+                style={{
+                  transition: 'transform 0.16s ease',
+                  transform: showDemoList ? 'rotate(180deg)' : 'rotate(0deg)'
+                }}
+              />
+            </button>
+
+            {showDemoList && (
+              <div style={{ padding: '0.25rem 0.5rem 0.4rem', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {DEMO_ACCOUNTS.map(acc => {
+                  const isCurrent = acc.email === currentUser?.email;
+                  return (
+                    <button
+                      key={acc.email}
+                      type="button"
+                      disabled={switchingDemo}
+                      onClick={() => handleSwitchDemoUser(acc)}
+                      className="btn btn-ghost btn-sm"
+                      style={{
+                        width: '100%',
+                        justifyContent: 'space-between',
+                        padding: '0.45rem 0.625rem',
+                        borderRadius: '6px',
+                        backgroundColor: isCurrent ? 'var(--color-primary-light)' : 'transparent'
+                      }}
+                    >
+                      <span style={{ fontWeight: 600, fontSize: '0.78rem', color: 'var(--text-main)' }}>{acc.name}</span>
+                      <span style={{
+                        fontSize: '0.625rem',
+                        fontWeight: 700,
+                        padding: '2px 6px',
+                        borderRadius: '999px',
+                        backgroundColor: acc.role === 'super_admin' ? 'var(--color-primary-light)' : acc.role === 'admin' ? 'var(--status-blue-bg)' : 'var(--status-green-bg)',
+                        color: acc.role === 'super_admin' ? 'var(--color-primary)' : acc.role === 'admin' ? 'var(--status-blue-text)' : 'var(--status-green-text)'
+                      }}>
+                        {acc.roleLabel}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <DropdownDivider />
+
             <DropdownItem
               icon={<LogOut size={16} />}
               label="Sign Out"
@@ -387,6 +415,22 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
           </AnimatedDropdown>
         </div>
       </div>
+
+      {/* Global Search Modal (Mobile) */}
+      <Modal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        title="Search Workspace"
+        maxWidth="540px"
+      >
+        <GlobalSearchBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          setActivePage={setActivePage}
+          inModal={true}
+          onCloseModal={() => setShowSearchModal(false)}
+        />
+      </Modal>
 
       <ConfirmDialog
         isOpen={showSignOutConfirm}

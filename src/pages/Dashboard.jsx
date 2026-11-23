@@ -193,6 +193,7 @@ export const Dashboard = ({ setActivePage }) => {
   const activeVendorsCount = data.vendors.filter(v => v.status === 'Active').length;
   const onDutyStaffCount = data.staff.filter(s => s.status === 'On Duty' || s.status === 'In Field').length;
 
+  const role = currentUser?.role || 'staff';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
   const isStaff = role === 'staff';

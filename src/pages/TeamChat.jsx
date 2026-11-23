@@ -108,34 +108,6 @@ export const TeamChat = () => {
     return () => window.removeEventListener('click', closeMenus);
   }, []);
 
-  if (currentUser?.role === 'super_admin') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        <div className="page-header-container">
-          <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Team Chat</h2>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Workspace &amp; direct messaging for Admin and Staff members.
-            </p>
-          </div>
-        </div>
-        <div style={{
-          backgroundColor: 'var(--bg-card)',
-          border: '1px solid var(--border-color)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '2.5rem',
-          textAlign: 'center',
-          color: 'var(--text-muted)'
-        }}>
-          <Lock size={28} style={{ marginBottom: '0.5rem', color: 'var(--color-primary)' }} />
-          <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-            Team Chat is restricted to Admin and Staff accounts.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   const togglePinConversation = (e, id) => {
     e.stopPropagation();
     setPinnedConvIds(prev => {
@@ -335,6 +307,34 @@ export const TeamChat = () => {
   const latestPinned = pinnedMessages[pinnedMessages.length - 1] || null;
 
   const isPeerOnline = selectedTarget && !selectedTarget.isWorkspace && onlineUserIds.includes(selectedTarget.id);
+
+  if (currentUser?.role === 'super_admin') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="page-header-container">
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Team Chat</h2>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Workspace &amp; direct messaging for Admin and Staff members.
+            </p>
+          </div>
+        </div>
+        <div style={{
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '2.5rem',
+          textAlign: 'center',
+          color: 'var(--text-muted)'
+        }}>
+          <Lock size={28} style={{ marginBottom: '0.5rem', color: 'var(--color-primary)' }} />
+          <p style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+            Team Chat is restricted to Admin and Staff accounts.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

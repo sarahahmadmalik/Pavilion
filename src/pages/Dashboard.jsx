@@ -202,50 +202,141 @@ export const Dashboard = ({ setActivePage }) => {
     return hasModulePermission(key);
   }).slice(0, 2);
 
-  // ─── KPI card configs ─────────────────────────────────────────────────────
-  const statCards = [
-    {
-      key: 'guest_list',
-      label: 'Checked-in Guests',
-      value: totalGuests,
-      subtext: 'Active stay allocations',
-      icon: UserCheck,
-      iconBg: 'var(--color-primary-light)',
-      iconColor: 'var(--color-primary)',
-      page: 'guest_list'
-    },
-    {
-      key: 'maintenance',
-      label: 'Open Maintenance',
-      value: openMaintenanceCount,
-      subtext: `${inProgressCount} in progress · ${resolvedCount} resolved`,
-      icon: Wrench,
-      iconBg: 'rgba(239,68,68,0.1)',
-      iconColor: '#EF4444',
-      page: 'gh_maintenance'
-    },
-    {
-      key: 'office_bills',
-      label: 'Total Disbursements',
-      value: `GHS ${totalBillsAmount.toLocaleString('en-GH', { maximumFractionDigits: 0 })}`,
-      subtext: `${data.bills.length} bill payments logged`,
-      icon: CreditCard,
-      iconBg: 'rgba(16,185,129,0.1)',
-      iconColor: '#10B981',
-      page: 'office_bills'
-    },
-    {
-      key: 'vehicles_maintenance',
-      label: 'Vehicles In Repair',
-      value: vehiclesInRepairCount,
-      subtext: 'Fleet maintenance in progress',
-      icon: Car,
-      iconBg: 'rgba(99,102,241,0.1)',
-      iconColor: '#6366F1',
-      page: 'vehicles_maintenance'
-    }
-  ].filter(card => {
+  // ─── Role-Specific KPI card configs ────────────────────────────────────────
+  const availableSuitesCount = data.rooms.filter(r => r.status === 'Available').length;
+
+  const statCardsByRole = {
+    super_admin: [
+      {
+        key: 'guest_list',
+        label: 'Checked-in Guests',
+        value: totalGuests,
+        subtext: `${occupancyPct}% suite occupancy`,
+        icon: UserCheck,
+        iconBg: 'var(--color-primary-light)',
+        iconColor: 'var(--color-primary)',
+        page: 'guest_list'
+      },
+      {
+        key: 'maintenance',
+        label: 'Open Maintenance',
+        value: openMaintenanceCount,
+        subtext: `${inProgressCount} in progress · ${resolvedCount} resolved`,
+        icon: Wrench,
+        iconBg: 'rgba(239,68,68,0.1)',
+        iconColor: '#EF4444',
+        page: 'gh_maintenance'
+      },
+      {
+        key: 'office_bills',
+        label: 'Total Disbursements',
+        value: `GHS ${totalBillsAmount.toLocaleString('en-GH', { maximumFractionDigits: 0 })}`,
+        subtext: `${data.bills.length} bill payments logged`,
+        icon: CreditCard,
+        iconBg: 'rgba(16,185,129,0.1)',
+        iconColor: '#10B981',
+        page: 'office_bills'
+      },
+      {
+        key: 'vendors',
+        label: 'Active Vendors',
+        value: activeVendorsCount,
+        subtext: `GHS ${activeProjectBudget.toLocaleString('en-GH', { maximumFractionDigits: 0 })} project budget`,
+        icon: Briefcase,
+        iconBg: 'rgba(99,102,241,0.1)',
+        iconColor: '#6366F1',
+        page: 'vendors'
+      }
+    ],
+    admin: [
+      {
+        key: 'room_occupancy',
+        label: 'Suite Occupancy',
+        value: `${occupancyPct}%`,
+        subtext: `${occupiedRoomsCount} of ${data.rooms.length} suites occupied`,
+        icon: BedDouble,
+        iconBg: 'var(--color-primary-light)',
+        iconColor: 'var(--color-primary)',
+        page: 'room_occupancy'
+      },
+      {
+        key: 'maintenance',
+        label: 'Open Maintenance',
+        value: openMaintenanceCount,
+        subtext: `${inProgressCount} in progress · ${vehiclesInRepairCount} fleet`,
+        icon: Wrench,
+        iconBg: 'rgba(239,68,68,0.1)',
+        iconColor: '#EF4444',
+        page: 'gh_maintenance'
+      },
+      {
+        key: 'projects',
+        label: 'Active Projects',
+        value: activeProjectsCount,
+        subtext: `${data.projects.length} total initiatives`,
+        icon: FolderKanban,
+        iconBg: 'rgba(245,158,11,0.12)',
+        iconColor: '#D97706',
+        page: 'projects'
+      },
+      {
+        key: 'tickets',
+        label: 'Open Tickets',
+        value: openTicketsCount,
+        subtext: `${onDutyStaffCount} staff on duty`,
+        icon: Ticket,
+        iconBg: 'rgba(16,185,129,0.1)',
+        iconColor: '#10B981',
+        page: 'tickets'
+      }
+    ],
+    staff: [
+      {
+        key: 'guest_list',
+        label: 'Guest Check-ins',
+        value: totalGuests,
+        subtext: `${availableSuitesCount} suites available now`,
+        icon: UserCheck,
+        iconBg: 'var(--color-primary-light)',
+        iconColor: 'var(--color-primary)',
+        page: 'guest_list'
+      },
+      {
+        key: 'maintenance',
+        label: 'Pending Tasks',
+        value: openMaintenanceCount + inProgressCount,
+        subtext: `${openMaintenanceCount} open · ${inProgressCount} in progress`,
+        icon: Wrench,
+        iconBg: 'rgba(239,68,68,0.1)',
+        iconColor: '#EF4444',
+        page: 'gh_maintenance'
+      },
+      {
+        key: 'room_occupancy',
+        label: 'Available Suites',
+        value: availableSuitesCount,
+        subtext: `${data.rooms.length} total guest house suites`,
+        icon: BedDouble,
+        iconBg: 'rgba(16,185,129,0.1)',
+        iconColor: '#10B981',
+        page: 'room_occupancy'
+      },
+      {
+        key: 'vehicles_maintenance',
+        label: 'Fleet & Events',
+        value: `${vehiclesInRepairCount} / ${data.events.length}`,
+        subtext: `${vehiclesInRepairCount} vehicles in shop · ${data.events.length} events`,
+        icon: Car,
+        iconBg: 'rgba(99,102,241,0.1)',
+        iconColor: '#6366F1',
+        page: 'community_events'
+      }
+    ]
+  };
+
+  const statCards = (statCardsByRole[role] || statCardsByRole.staff).filter(card => {
     if (card.key === 'maintenance') return hasModulePermission('gh_maintenance') || hasModulePermission('office_maintenance') || hasModulePermission('vehicles_maintenance');
+    if (card.key === 'tickets') return true;
     return hasModulePermission(card.key);
   });
 

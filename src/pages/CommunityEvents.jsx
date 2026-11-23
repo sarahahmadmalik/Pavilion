@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { fetchCommunityEvents, createCommunityEvent, updateCommunityEvent } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { Megaphone, Calendar, MapPin, Users, Plus, Pin, Check } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 6;
 
 export const CommunityEvents = () => {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     title: '',
@@ -75,9 +80,13 @@ export const CommunityEvents = () => {
         }}>
           No community notices or events yet. Click <strong>Post Notice / Event</strong> to publish one.
         </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '1rem' }}>
-          {events.map(evt => (
+      ) : (() => {
+        const totalPages = Math.max(1, Math.ceil(events.length / ITEMS_PER_PAGE));
+        const paginated = events.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        return (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: '1rem' }}>
+              {paginated.map(evt => (
             <div
               key={evt.id}
               style={{
@@ -133,8 +142,17 @@ export const CommunityEvents = () => {
               </div>
             </div>
           ))}
-        </div>
-      )}
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={events.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      })()}
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Post Community Notice or Event">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -144,12 +162,12 @@ export const CommunityEvents = () => {
           </div>
           <div className="responsive-form-grid-2">
             <div>
-              <label className="form-label">Category</label>
-              <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option value="Community Meeting">Community Meeting</option>
-                <option value="Maintenance Notice">Maintenance Notice</option>
-                <option value="Social & Hospitality">Social & Hospitality</option>
-              </select>
+              <CustomSelect
+                label="Category"
+                value={form.category}
+                onChange={val => setForm({ ...form, category: val })}
+                options={['Community Meeting', 'Maintenance Notice', 'Social & Hospitality']}
+              />
             </div>
             <div>
               <label className="form-label">Location</label>

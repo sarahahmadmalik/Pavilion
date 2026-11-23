@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { fetchRoomOccupancy, createRoomSuite, updateRoomSuite } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { BedDouble, CheckCircle2, Clock, Wrench, Sparkles, Users, Calendar, Plus } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 6;
 
 const STATUS_BADGE = {
   Occupied: { bg: 'var(--status-blue-bg)', color: 'var(--status-blue-text)', icon: Users },
@@ -14,6 +18,7 @@ export const RoomOccupancy = () => {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -41,6 +46,10 @@ export const RoomOccupancy = () => {
   };
 
   const visible = filter === 'All' ? rooms : rooms.filter(r => r.status === filter);
+  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE));
+  const paginated = visible.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [filter]);
 
   const cycleHousekeeping = async (room) => {
     const order = ['Inspected', 'Turnaround', 'In Service'];
@@ -87,19 +96,15 @@ export const RoomOccupancy = () => {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <div style={{ minWidth: '200px' }}>
-          <select
-            className="form-input"
+        <div style={{ minWidth: '210px' }}>
+          <CustomSelect
             value={filter}
-            onChange={e => setFilter(e.target.value)}
-            aria-label="Filter suites by status"
-          >
-            {Object.keys(counts).map(key => (
-              <option key={key} value={key}>
-                {key === 'All' ? `All Suites (${counts[key]})` : `${key} (${counts[key]})`}
-              </option>
-            ))}
-          </select>
+            onChange={setFilter}
+            options={Object.keys(counts).map(key => ({
+              value: key,
+              label: key === 'All' ? `All Suites (${counts[key]})` : `${key} (${counts[key]})`
+            }))}
+          />
         </div>
       </div>
 
@@ -118,7 +123,7 @@ export const RoomOccupancy = () => {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: '1rem' }}>
-          {visible.map(room => {
+          {paginated.map(room => {
             const badge = STATUS_BADGE[room.status] || STATUS_BADGE.Available;
             const Icon = badge.icon;
             return (
@@ -198,6 +203,14 @@ export const RoomOccupancy = () => {
           })}
         </div>
       )}
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={visible.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setCurrentPage}
+      />
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Guest House Suite">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

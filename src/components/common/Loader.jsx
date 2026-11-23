@@ -15,8 +15,8 @@ const progressBarKeyframes = `@keyframes progressBarGlow { 0% { background-posit
 const logoPulseKeyframes = `@keyframes logoPulse { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.04); opacity: 1; } }`;
 
 /**
- * PageLoader — Signature PAVILION brand loader (Slack/Figma style).
- * Animates the actual PAVILION logo geometry smoothly separating and snapping back together.
+ * PageLoader — Clean, understated enterprise splash loader.
+ * Displays the PAVILION logo + wordmark with a smooth gliding progress bar.
  */
 export const PageLoader = () => {
   return (
@@ -24,58 +24,31 @@ export const PageLoader = () => {
       position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      backgroundColor: 'var(--bg-page)', padding: '2rem', gap: '1rem'
+      backgroundColor: 'var(--bg-page)', padding: '2rem', gap: '1.25rem'
     }}>
       <style>{`
-        @keyframes pavilionAssembleA {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          35% { transform: translate(-5px, -5px) scale(0.94); }
-          65% { transform: translate(2px, 2px) scale(1.02); }
-        }
-        @keyframes pavilionAssembleB {
-          0%, 100% { transform: translate(0, 0) scale(1); }
-          35% { transform: translate(5px, 5px) scale(0.94); }
-          65% { transform: translate(-2px, -2px) scale(1.02); }
-        }
-        @keyframes pavilionCoreSpin {
-          0%, 100% { transform: rotate(0deg) scale(1); opacity: 1; }
-          35% { transform: rotate(45deg) scale(0.75); opacity: 0.7; }
-          70% { transform: rotate(90deg) scale(1.08); opacity: 1; }
+        @keyframes pavilionBarGlide {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(220%); }
         }
       `}</style>
 
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', userSelect: 'none' }}>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', userSelect: 'none' }}>
         <svg
-          width={44}
-          height={44}
-          viewBox="6 6 52 52"
+          width={38}
+          height={38}
+          viewBox="10 10 44 44"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          style={{ flexShrink: 0, overflow: 'visible' }}
+          style={{ flexShrink: 0 }}
         >
-          <path
-            d="M12 12H42V22H22V42H12V12Z"
-            fill="#1A3FA0"
-            style={{ animation: 'pavilionAssembleA 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
-          />
-          <path
-            d="M52 52H22V42H42V22H52V52Z"
-            fill="#3B82F6"
-            style={{ animation: 'pavilionAssembleB 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
-          />
-          <rect
-            x="27"
-            y="27"
-            width="10"
-            height="10"
-            rx="1.5"
-            fill="#60A5FA"
-            style={{ animation: 'pavilionCoreSpin 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
-          />
+          <path d="M12 12H42V22H22V42H12V12Z" fill="#1A3FA0" />
+          <path d="M52 52H22V42H42V22H52V52Z" fill="#3B82F6" />
+          <rect x="27" y="27" width="10" height="10" fill="#60A5FA" />
         </svg>
 
         <span style={{
-          fontSize: '1.35rem',
+          fontSize: '1.3rem',
           fontWeight: 800,
           letterSpacing: '0.14em',
           color: 'var(--text-main)',
@@ -83,6 +56,23 @@ export const PageLoader = () => {
         }}>
           PAVILION
         </span>
+      </div>
+
+      <div style={{
+        width: '150px',
+        height: '3px',
+        borderRadius: '999px',
+        backgroundColor: 'var(--border-color)',
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        <div style={{
+          width: '45%',
+          height: '100%',
+          borderRadius: '999px',
+          background: 'linear-gradient(90deg, #1A3FA0, #3B82F6)',
+          animation: 'pavilionBarGlide 1.15s ease-in-out infinite'
+        }} />
       </div>
     </div>
   );

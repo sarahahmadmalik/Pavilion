@@ -2,11 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { fetchVendors, createVendor, deleteVendor } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { Plus, Search, Trash2, Award, Phone, Mail, Calendar } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 6;
 
 export const VendorHub = () => {
   const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
@@ -25,7 +30,10 @@ export const VendorHub = () => {
     setVendors(data || []);
   };
 
-  useEffect(() => { load(); }, [search]);
+  useEffect(() => { setCurrentPage(1); load(); }, [search]);
+
+  const totalPages = Math.max(1, Math.ceil(vendors.length / ITEMS_PER_PAGE));
+  const paginated = vendors.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -73,7 +81,7 @@ export const VendorHub = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(310px, 1fr))', gap: '1rem' }}>
-        {vendors.map(v => (
+        {paginated.map(v => (
           <div
             key={v.id}
             style={{
@@ -142,6 +150,14 @@ export const VendorHub = () => {
         ))}
       </div>
 
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={vendors.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setCurrentPage}
+      />
+
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Register Preferred Vendor">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div>
@@ -154,11 +170,12 @@ export const VendorHub = () => {
               <input className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
             </div>
             <div>
-              <label className="form-label">Status</label>
-              <select className="form-input" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                <option value="Active">Active</option>
-                <option value="Under Review">Under Review</option>
-              </select>
+              <CustomSelect
+                label="Status"
+                value={form.status}
+                onChange={val => setForm({ ...form, status: val })}
+                options={['Active', 'Under Review']}
+              />
             </div>
           </div>
           <div className="responsive-form-grid-2">

@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { fetchProjects, createProject, updateProject, deleteProject } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { Plus, Trash2, Calendar, DollarSign, ArrowRight, CheckCircle2, FolderKanban } from 'lucide-react';
 
 const STAGES = ['Todo', 'In Progress', 'Review', 'Completed'];
+const ITEMS_PER_PAGE = 8;
 
 const PRIORITY_STYLES = {
   High: { bg: 'var(--status-red-bg)', color: 'var(--status-red-text)' },
@@ -15,6 +18,8 @@ const PRIORITY_STYLES = {
 export const ProjectsBoard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [stageFilter, setStageFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({
@@ -78,13 +83,32 @@ export const ProjectsBoard = () => {
         </div>
       </div>
 
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: '200px' }}>
+          <CustomSelect
+            value={stageFilter}
+            onChange={val => { setStageFilter(val); setCurrentPage(1); }}
+            options={[
+              { value: 'All', label: `All Stages (${projects.length})` },
+              ...STAGES.map(s => ({ value: s, label: `${s} (${projects.filter(p => p.status === s).length})` }))
+            ]}
+          />
+        </div>
+      </div>
+
       {loading ? (
         <p style={{ color: 'var(--text-muted)' }}>Loading board...</p>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'start' }}>
-          {STAGES.map(stage => {
-            const items = projects.filter(p => p.status === stage);
-            return (
+      ) : (() => {
+        const filteredProjects = stageFilter === 'All' ? projects : projects.filter(p => p.status === stageFilter);
+        const totalPages = Math.max(1, Math.ceil(filteredProjects.length / ITEMS_PER_PAGE));
+        const visibleProjects = filteredProjects.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+        const visibleStages = stageFilter === 'All' ? STAGES : [stageFilter];
+        return (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', alignItems: 'start' }}>
+              {visibleStages.map(stage => {
+                const items = visibleProjects.filter(p => p.status === stage);
+                return (
               <div
                 key={stage}
                 style={{
@@ -176,8 +200,17 @@ export const ProjectsBoard = () => {
               </div>
             );
           })}
-        </div>
-      )}
+            </div>
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredProjects.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setCurrentPage}
+            />
+          </>
+        );
+      })()}
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Create Strategic Initiative">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -197,12 +230,12 @@ export const ProjectsBoard = () => {
           </div>
           <div className="responsive-form-grid-3">
             <div>
-              <label className="form-label">Priority</label>
-              <select className="form-input" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
+              <CustomSelect
+                label="Priority"
+                value={form.priority}
+                onChange={val => setForm({ ...form, priority: val })}
+                options={['High', 'Medium', 'Low']}
+              />
             </div>
             <div>
               <label className="form-label">Budget ($)</label>

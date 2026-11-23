@@ -84,7 +84,7 @@ export const Sidebar = ({
     {
       label: 'Communication & Admin',
       items: [
-        { key: 'team_chat', label: 'Team Chat', icon: MessageSquare, permission: currentUser?.role !== 'super_admin', badge: chatUnreadCount },
+        { key: 'team_chat', label: 'Team Chat', icon: MessageSquare, permission: true, badge: currentUser?.role !== 'super_admin' ? chatUnreadCount : 0 },
         { key: 'tickets', label: 'Support Tickets', icon: Ticket, permission: true, badge: ticketUnreadCount },
         { key: 'activity_log', label: 'Activity Log', icon: ClipboardList, permission: currentUser?.role !== 'staff' },
         { key: 'user_management', label: 'User Management', icon: ShieldCheck, permission: currentUser?.role === 'super_admin' }

@@ -1,13 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { fetchStaffDirectory, createStaffMember } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
 import { Plus, Search, MapPin, Mail, Phone } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 6;
 
 export const StaffDirectory = () => {
   const [staff, setStaff] = useState([]);
   const [search, setSearch] = useState('');
   const [deptFilter, setDeptFilter] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -29,6 +34,10 @@ export const StaffDirectory = () => {
 
   const departments = ['All', ...Array.from(new Set(staff.map(s => s.department)))];
   const visible = deptFilter === 'All' ? staff : staff.filter(s => s.department === deptFilter);
+  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE));
+  const paginated = visible.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [search, deptFilter]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -70,23 +79,18 @@ export const StaffDirectory = () => {
             style={{ paddingLeft: '2.35rem' }}
           />
         </div>
-        <div style={{ minWidth: '190px' }}>
-          <select
-            className="form-input"
+        <div style={{ minWidth: '210px' }}>
+          <CustomSelect
             value={deptFilter}
-            onChange={e => setDeptFilter(e.target.value)}
-            aria-label="Filter by department"
-          >
-            {departments.map(d => (
-              <option key={d} value={d}>{d === 'All' ? 'All Departments' : d}</option>
-            ))}
-          </select>
+            onChange={setDeptFilter}
+            options={departments.map(d => ({ value: d, label: d === 'All' ? 'All Departments' : d }))}
+          />
         </div>
       </div>
 
       {/* Cards Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-        {visible.map(member => (
+        {paginated.map(member => (
           <div
             key={member.id}
             style={{
@@ -139,6 +143,14 @@ export const StaffDirectory = () => {
           </div>
         ))}
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={visible.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setCurrentPage}
+      />
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Team Member">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>

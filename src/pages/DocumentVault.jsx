@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { fetchDocuments, createDocument, deleteDocument } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
 import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Pagination } from '../components/common/Pagination.jsx';
 import { FileText, Plus, Search, Trash2, Eye, ShieldCheck } from 'lucide-react';
+
+const ITEMS_PER_PAGE = 6;
 
 export const DocumentVault = () => {
   const [docs, setDocs] = useState([]);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -29,6 +34,10 @@ export const DocumentVault = () => {
 
   const categories = ['All', 'SOP', 'Legal & Compliance', 'Engineering', 'Finance'];
   const visible = category === 'All' ? docs : docs.filter(d => d.category === category);
+  const totalPages = Math.max(1, Math.ceil(visible.length / ITEMS_PER_PAGE));
+  const paginated = visible.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+  useEffect(() => { setCurrentPage(1); }, [search, category]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -75,22 +84,17 @@ export const DocumentVault = () => {
             style={{ paddingLeft: '2.35rem' }}
           />
         </div>
-        <div style={{ minWidth: '190px' }}>
-          <select
-            className="form-input"
+        <div style={{ minWidth: '210px' }}>
+          <CustomSelect
             value={category}
-            onChange={e => setCategory(e.target.value)}
-            aria-label="Filter by document category"
-          >
-            {categories.map(c => (
-              <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>
-            ))}
-          </select>
+            onChange={setCategory}
+            options={categories.map(c => ({ value: c, label: c === 'All' ? 'All Categories' : c }))}
+          />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
-        {visible.map(doc => (
+        {paginated.map(doc => (
           <div
             key={doc.id}
             style={{
@@ -163,6 +167,14 @@ export const DocumentVault = () => {
         ))}
       </div>
 
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        totalItems={visible.length}
+        itemsPerPage={ITEMS_PER_PAGE}
+        onPageChange={setCurrentPage}
+      />
+
       {/* Preview Modal */}
       <Modal isOpen={!!previewDoc} onClose={() => setPreviewDoc(null)} title={previewDoc?.title || 'Document Preview'}>
         {previewDoc && (
@@ -197,13 +209,12 @@ export const DocumentVault = () => {
           </div>
           <div className="responsive-form-grid-2">
             <div>
-              <label className="form-label">Category</label>
-              <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
-                <option value="SOP">SOP</option>
-                <option value="Legal & Compliance">Legal & Compliance</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Finance">Finance</option>
-              </select>
+              <CustomSelect
+                label="Category"
+                value={form.category}
+                onChange={val => setForm({ ...form, category: val })}
+                options={['SOP', 'Legal & Compliance', 'Engineering', 'Finance']}
+              />
             </div>
             <div>
               <label className="form-label">Owner</label>

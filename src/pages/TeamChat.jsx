@@ -17,6 +17,7 @@ import {
 } from '../lib/supabaseService.js';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
 import { CustomSelect } from '../components/common/CustomSelect.jsx';
+import { Modal } from '../components/common/Modal.jsx';
 import { ErrorBanner } from '../components/common/ErrorBanner.jsx';
 import {
   Search,
@@ -37,7 +38,8 @@ import {
   Image as ImageIcon,
   Camera,
   Ban,
-  Reply
+  Reply,
+  MessageSquarePlus
 } from 'lucide-react';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -82,6 +84,8 @@ export const TeamChat = () => {
   const [loadingPeers, setLoadingPeers] = useState(true);
 
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [showPeopleModal, setShowPeopleModal] = useState(false);
+  const [peopleSearch, setPeopleSearch] = useState('');
   const [openMenuMsgId, setOpenMenuMsgId] = useState(null);
   const [openReactMsgId, setOpenReactMsgId] = useState(null);
   const [pinnedConvIds, setPinnedConvIds] = useState(() => {
@@ -302,12 +306,15 @@ export const TeamChat = () => {
 
   const filteredPeers = peers
     .filter(p => {
+      const { last, unread } = getPeerMeta(p.id);
+      const isActiveSelection = !selectedTarget?.isWorkspace && selectedTarget?.id === p.id;
+      if (!last && !isActiveSelection) return false;
+
       const matchesSearch = !search.trim() ||
         p.name.toLowerCase().includes(search.toLowerCase()) ||
         p.email.toLowerCase().includes(search.toLowerCase());
       if (!matchesSearch) return false;
       if (readFilter === 'all') return true;
-      const { unread } = getPeerMeta(p.id);
       return readFilter === 'unread' ? unread > 0 : unread === 0;
     })
     .sort((a, b) => {
@@ -315,6 +322,13 @@ export const TeamChat = () => {
       const bPin = pinnedConvIds.includes(b.id) ? 1 : 0;
       return bPin - aPin;
     });
+
+  const modalPeople = peers.filter(p =>
+    !peopleSearch.trim() ||
+    p.name.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+    p.email.toLowerCase().includes(peopleSearch.toLowerCase()) ||
+    p.role.toLowerCase().includes(peopleSearch.toLowerCase())
+  );
 
   const visibleMessages = messages.filter(m => !(m.deleted_for || []).includes(currentUser.id));
   const pinnedMessages = visibleMessages.filter(m => m.is_pinned && !m.deleted_for_all);
@@ -380,15 +394,26 @@ export const TeamChat = () => {
           }}
         >
           <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <div style={{ position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                className="form-input"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search chats..."
-                style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: '999px', backgroundColor: 'var(--bg-page)' }}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+              <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  className="form-input"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search chats..."
+                  style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: '999px', backgroundColor: 'var(--bg-page)' }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPeopleModal(true)}
+                className="btn btn-primary"
+                title="People in Workspace / New Chat"
+                style={{ padding: '0.5rem', borderRadius: '50%', width: '36px', height: '36px', flexShrink: 0 }}
+              >
+                <MessageSquarePlus size={16} />
+              </button>
             </div>
             <CustomSelect
               value={readFilter}
@@ -437,7 +462,17 @@ export const TeamChat = () => {
             {loadingPeers ? (
               <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading team...</p>
             ) : filteredPeers.length === 0 ? (
-              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No team members found.</p>
+              <div style={{ padding: '1.25rem 1rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <p style={{ marginBottom: '0.6rem' }}>No chat history yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowPeopleModal(true)}
+                  className="btn btn-secondary btn-sm"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <MessageSquarePlus size={14} /> Start a Chat
+                </button>
+              </div>
             ) : (
               filteredPeers.map(peer => {
                 const { last, unread } = getPeerMeta(peer.id);
@@ -977,6 +1012,72 @@ export const TeamChat = () => {
           </form>
         </div>
       </div>
+
+      {/* People in Workspace Modal */}
+      <Modal
+        isOpen={showPeopleModal}
+        onClose={() => { setShowPeopleModal(false); setPeopleSearch(''); }}
+        title="People in Workspace"
+        maxWidth="440px"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input
+              className="form-input"
+              value={peopleSearch}
+              onChange={e => setPeopleSearch(e.target.value)}
+              placeholder="Search Admin & Staff members..."
+              style={{ paddingLeft: '2.2rem' }}
+            />
+          </div>
+
+          <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {modalPeople.length === 0 ? (
+              <p style={{ textAlign: 'center', padding: '1.5rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                No matching workspace members found.
+              </p>
+            ) : (
+              modalPeople.map(person => {
+                const online = onlineUserIds.includes(person.id);
+                return (
+                  <button
+                    key={person.id}
+                    type="button"
+                    onClick={() => {
+                      handleSelectTarget(person);
+                      setShowPeopleModal(false);
+                      setPeopleSearch('');
+                    }}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-page)',
+                      cursor: 'pointer', textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <UserAvatar name={person.name} src={person.avatar} size={38} />
+                      <span style={{
+                        position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px',
+                        borderRadius: '50%', backgroundColor: online ? '#22C55E' : '#94A3B8',
+                        border: '2px solid var(--bg-page)'
+                      }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{person.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                        {person.role} · {online ? 'Online' : formatLastSeen(person.last_seen)}
+                      </div>
+                    </div>
+                    <span className="btn btn-primary btn-sm" style={{ flexShrink: 0 }}>Message</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

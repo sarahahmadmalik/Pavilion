@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase.js';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { useAuth } from './AuthContext.jsx';
 import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '../lib/supabaseService.js';
 import { playNotificationChime } from '../lib/notificationSound.js';
@@ -33,7 +33,7 @@ export const NotificationProvider = ({ children }) => {
 
     loadNotifications();
 
-    if (currentUser) {
+    if (currentUser && isSupabaseConfigured()) {
       // Subscribe to real-time inserts for the current user
       subscription = supabase
         .channel('notifications_channel')

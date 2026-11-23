@@ -288,7 +288,7 @@ export const ActivityLog = ({ searchQuery }) => {
             System Audit &amp; Activity Logs
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Full audit trail of all user actions across MTA Ghana.
+            Full audit trail of all user actions across PAVILION.
           </p>
         </div>
       </div>

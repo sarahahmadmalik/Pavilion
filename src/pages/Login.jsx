@@ -3,11 +3,14 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { Modal } from '../components/common/Modal.jsx';
 import { Spinner } from '../components/common/Loader.jsx';
-import { Eye, EyeOff, Lock, Mail, ShieldAlert, Sun, Moon, Zap, ShieldCheck, Shield, User } from 'lucide-react';
+import { BrandLogo } from '../components/common/BrandLogo.jsx';
+import { isSupabaseConfigured } from '../lib/supabase.js';
+import { Eye, EyeOff, Lock, Mail, ShieldAlert, Sun, Moon } from 'lucide-react';
 
 export const Login = ({ onLoginSuccess }) => {
   const { login } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const configured = isSupabaseConfigured();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,17 +19,36 @@ export const Login = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const now = Date.now();
+    if (lockoutUntil > now) {
+      const secs = Math.ceil((lockoutUntil - now) / 1000);
+      setErrorMessage(`Too many failed sign-in attempts. Please wait ${secs} seconds and try again.`);
+      return;
+    }
+
     setErrorMessage('');
     setIsSubmitting(true);
     const res = await login(email, password);
     setIsSubmitting(false);
     if (res.success) {
+      setFailedAttempts(0);
+      setLockoutUntil(0);
       onLoginSuccess();
     } else {
-      setErrorMessage(res.message);
+      const nextAttempts = failedAttempts + 1;
+      setFailedAttempts(nextAttempts);
+      if (nextAttempts >= 5) {
+        setLockoutUntil(Date.now() + 30000);
+        setFailedAttempts(0);
+        setErrorMessage('Too many failed sign-in attempts. Sign-in is paused for 30 seconds for your security.');
+      } else {
+        setErrorMessage(res.message);
+      }
     }
   };
 
@@ -74,26 +96,19 @@ export const Login = ({ onLoginSuccess }) => {
         padding: '2.5rem 2rem',
         animation: 'slideUp 0.3s ease-out'
       }}>
-        {/* Logo only — no text */}
+        {/* PAVILION Brand Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <img
-            src="/logo.png"
-            alt="MTA Ghana Logo"
-            style={{
-              width: '120px',
-              height: '120px',
-              objectFit: 'contain',
-              margin: '0 auto 0.75rem',
-              display: 'block',
-              filter: 'drop-shadow(0 6px 16px rgba(26, 63, 160, 0.22))'
-            }}
-          />
-          <p style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--color-primary)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.25rem' }}>
-            Operations Portal
-          </p>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+            <BrandLogo size={50} showText={true} lightText={false} subtitle="Community & Guest House" />
+          </div>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 700, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
             Sign in to your account
           </h2>
+          {!configured && (
+            <p style={{ fontSize: '0.78rem', color: 'var(--status-amber-text)', marginTop: '0.45rem' }}>
+              Connect your Supabase project in <code>.env</code> to sign in.
+            </p>
+          )}
         </div>
 
         {errorMessage && (
@@ -125,7 +140,7 @@ export const Login = ({ onLoginSuccess }) => {
                 required
                 className="input-control"
                 style={{ paddingLeft: '2.5rem' }}
-                placeholder="user@mtaghana.org"
+                placeholder="user@pavilion-ops.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -207,7 +222,7 @@ export const Login = ({ onLoginSuccess }) => {
       </div>
 
       <footer style={{ marginTop: '2rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-        MTA Ghana © 2026 • All Rights Reserved
+        © 2026 PAVILION. All Rights Reserved.
       </footer>
 
       {/* Forgot Password Modal */}

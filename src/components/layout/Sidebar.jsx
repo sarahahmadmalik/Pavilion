@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
+import { BrandLogo } from '../common/BrandLogo.jsx';
 import {
   LayoutDashboard,
   Users,
@@ -14,10 +15,18 @@ import {
   ChevronRight,
   ChevronLeft,
   LogOut,
-  X
+  X,
+  BarChart3,
+  FolderKanban,
+  Briefcase,
+  Contact,
+  FileText,
+  BedDouble,
+  Megaphone,
+  MessageSquare
 } from 'lucide-react';
 
-const ACTIVE_COLOR   = '#4B7FE8';          // bright readable blue on dark bg
+const ACTIVE_COLOR   = '#4B7FE8';
 const ACTIVE_BG      = 'rgba(75, 127, 232, 0.14)';
 const INACTIVE_COLOR = '#6B7A99';
 
@@ -37,7 +46,9 @@ export const Sidebar = ({
 
   const mainItems = [
     { key: 'dashboard',          label: 'Dashboard',            icon: LayoutDashboard, permission: true },
-    { key: 'guest_list',         label: 'Guest List',           icon: Users,           permission: hasModulePermission('guest_list') },
+    { key: 'analytics',          label: 'Community Analytics',  icon: BarChart3,       permission: hasModulePermission('analytics') },
+    { key: 'room_occupancy',     label: 'Suites & Occupancy',   icon: BedDouble,       permission: hasModulePermission('room_occupancy') },
+    { key: 'guest_list',         label: 'Guest House List',     icon: Users,           permission: hasModulePermission('guest_list') },
     { key: 'gh_maintenance',     label: 'GH Maintenance',       icon: Wrench,          permission: hasModulePermission('gh_maintenance') },
     { key: 'gh_inventory',       label: 'GH Inventory',         icon: Package,         permission: hasModulePermission('gh_inventory') },
     { key: 'office_bills',       label: 'Office Bill Payments', icon: CreditCard,      permission: hasModulePermission('office_bills') },
@@ -46,7 +57,13 @@ export const Sidebar = ({
   ];
 
   const managementItems = [
-    { key: 'tickets',            label: 'Tickets',              icon: Ticket,          permission: true, badge: ticketUnreadCount },
+    { key: 'projects',           label: 'Community Projects',   icon: FolderKanban,    permission: hasModulePermission('projects') },
+    { key: 'community_events',   label: 'Notices & Events',     icon: Megaphone,       permission: hasModulePermission('community_events') },
+    { key: 'vendors',            label: 'Vendors & Contracts',  icon: Briefcase,       permission: hasModulePermission('vendors') },
+    { key: 'staff_directory',    label: 'Community Staff',      icon: Contact,         permission: hasModulePermission('staff_directory') },
+    { key: 'documents',          label: 'Document Vault',       icon: FileText,        permission: hasModulePermission('documents') },
+    { key: 'team_chat',          label: 'Team Chat',            icon: MessageSquare,   permission: currentUser?.role !== 'super_admin' },
+    { key: 'tickets',            label: 'Support Tickets',      icon: Ticket,          permission: true, badge: ticketUnreadCount },
     { key: 'activity_log',       label: 'Activity Log',         icon: ClipboardList,   permission: currentUser?.role !== 'staff' },
     { key: 'user_management',    label: 'User Management',      icon: ShieldCheck,     permission: currentUser?.role === 'super_admin' }
   ];
@@ -196,26 +213,12 @@ export const Sidebar = ({
             onClick={() => { if (isCollapsed) setIsCollapsed(false); }}
             style={{
               position: 'relative',
-              width: '48px',
-              height: '48px',
               cursor: isCollapsed ? 'pointer' : 'default',
               flexShrink: 0
             }}
             title={isCollapsed ? 'Expand Sidebar' : undefined}
           >
-            <img
-              src="/logo.png"
-              alt="MTA Ghana"
-              style={{
-                width: '48px',
-                height: '48px',
-                objectFit: 'contain',
-                borderRadius: '50%',
-                backgroundColor: '#FFFFFF',
-                padding: '3px',
-                display: 'block'
-              }}
-            />
+            <BrandLogo size={isCollapsed ? 28 : 30} showText={!isCollapsed} lightText={true} subtitle="Community & Guest House" />
 
             {/* Hover overlay on logo ONLY when collapsed */}
             {isCollapsed && (
@@ -223,8 +226,8 @@ export const Sidebar = ({
                 style={{
                   position: 'absolute',
                   inset: 0,
-                  borderRadius: '50%',
-                  backgroundColor: 'rgba(8, 12, 28, 0.75)',
+                  borderRadius: '12px',
+                  backgroundColor: 'rgba(8, 12, 28, 0.78)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -237,69 +240,6 @@ export const Sidebar = ({
               </div>
             )}
           </div>
-
-          {/* Text — visible when expanded */}
-          {!isCollapsed && (
-            <div style={{ flex: 1, overflow: 'hidden', minWidth: 0 }}>
-              <p style={{
-                fontSize: '0.9375rem',
-                fontWeight: 800,
-                color: '#FFFFFF',
-                letterSpacing: '-0.01em',
-                lineHeight: 1.2,
-                whiteSpace: 'nowrap'
-              }}>
-                MTA Ghana
-              </p>
-              <p style={{
-                fontSize: '0.6875rem',
-                fontWeight: 500,
-                color: '#4B7FE8',
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                marginTop: '2px',
-                whiteSpace: 'nowrap'
-              }}>
-                Operations Panel
-              </p>
-            </div>
-          )}
-
-          {/* Collapse button on right side when expanded */}
-          {!isCollapsed && !isMobileOpen && (
-            <button
-              onClick={() => setIsCollapsed(true)}
-              title="Collapse Sidebar"
-              style={{
-                flexShrink: 0,
-                width: '24px',
-                height: '24px',
-                borderRadius: '6px',
-                border: '1px solid rgba(255,255,255,0.12)',
-                backgroundColor: 'rgba(255,255,255,0.06)',
-                color: '#6B7A99',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-                transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
-                marginLeft: 'auto'
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor = 'rgba(75,127,232,0.18)';
-                e.currentTarget.style.color = '#4B7FE8';
-                e.currentTarget.style.borderColor = 'rgba(75,127,232,0.35)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
-                e.currentTarget.style.color = '#6B7A99';
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
-              }}
-            >
-              <ChevronLeft size={14} strokeWidth={2.5} />
-            </button>
-          )}
-
 
           {/* Mobile close */}
           {isMobileOpen && (
@@ -357,20 +297,26 @@ export const Sidebar = ({
           {managementItems.map(renderNavItem)}
         </nav>
 
-        {/* ── Sign Out ── */}
+        {/* ── Sign Out & Collapse Toggle ── */}
         <div style={{
           padding: '0.625rem',
           borderTop: '1px solid rgba(255,255,255,0.05)',
-          flexShrink: 0
+          flexShrink: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
+          flexDirection: isCollapsed ? 'column' : 'row',
+          gap: '0.375rem'
         }}>
           <button
             onClick={handleSignOut}
             style={{
-              width: '100%',
+              flex: isCollapsed ? 'none' : 1,
+              width: isCollapsed ? '100%' : 'auto',
               display: 'flex',
               alignItems: 'center',
               gap: '0.8125rem',
-              padding: isCollapsed ? '0.75rem 0' : '0.625rem 0.875rem',
+              padding: isCollapsed ? '0.625rem 0' : '0.625rem 0.875rem',
               borderRadius: '9px',
               backgroundColor: 'transparent',
               color: '#5D6A85',
@@ -395,6 +341,40 @@ export const Sidebar = ({
             <LogOut size={20} strokeWidth={1.6} style={{ flexShrink: 0, color: 'inherit' }} />
             {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>Sign Out</span>}
           </button>
+
+          {!isMobileOpen && (
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+              style={{
+                flexShrink: 0,
+                width: isCollapsed ? '100%' : '28px',
+                height: '28px',
+                borderRadius: '7px',
+                border: '1px solid rgba(255,255,255,0.12)',
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: '#6B7A99',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'background 0.15s ease, color 0.15s ease, border-color 0.15s ease',
+                marginLeft: isCollapsed ? 0 : 'auto'
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(75,127,232,0.18)';
+                e.currentTarget.style.color = '#4B7FE8';
+                e.currentTarget.style.borderColor = 'rgba(75,127,232,0.35)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.06)';
+                e.currentTarget.style.color = '#6B7A99';
+                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)';
+              }}
+            >
+              {isCollapsed ? <ChevronRight size={15} strokeWidth={2.5} /> : <ChevronLeft size={15} strokeWidth={2.5} />}
+            </button>
+          )}
         </div>
       </aside>
     </>

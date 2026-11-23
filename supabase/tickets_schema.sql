@@ -1,6 +1,6 @@
 -- ============================================================================
--- MTA Ghana Operations Dashboard — Support Ticket System Schema
--- Run this in your Supabase SQL Editor
+-- PAVILION — Support Ticket System Schema
+-- Run this in your Supabase SQL Editor (after schema.sql & notifications_schema.sql)
 -- ============================================================================
 
 -- 1. ENUMS
@@ -54,9 +54,16 @@ CREATE TABLE IF NOT EXISTS public.ticket_replies (
 -- 4. DROP the old dedicated ticket_notifications table (superseded — see step 5)
 DROP TABLE IF EXISTS public.ticket_notifications CASCADE;
 
--- 5. Reuse the existing public.notifications table (from notifications_schema.sql)
--- for ticket notifications too, so tickets plug into the notification system
--- that's already wired up (fetchNotifications / markNotificationAsRead / realtime).
+-- 5. Ensure public.notifications exists (if notifications_schema.sql wasn't run yet)
+-- and add ticket_id column for deep-linked ticket notifications.
+CREATE TABLE IF NOT EXISTS public.notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS ticket_id UUID REFERENCES public.tickets(id) ON DELETE CASCADE;
 
 -- 6. RLS — permissive, matching this project's existing convention
@@ -112,9 +119,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 GRANT EXECUTE ON FUNCTION public.close_stale_tickets() TO authenticated;
 
--- Requires pg_cron: Supabase Dashboard → Database → Extensions → pg_cron
-SELECT cron.schedule(
-  'auto-close-stale-tickets',
-  '0 3 * * *',
-  $$ SELECT public.close_stale_tickets(); $$
-);
+-- Schedule daily stale-ticket sweep only if pg_cron extension is enabled
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
+    PERFORM cron.schedule(
+      'auto-close-stale-tickets',
+      '0 3 * * *',
+      'SELECT public.close_stale_tickets();'
+    );
+  END IF;
+END $$;

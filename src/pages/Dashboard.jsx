@@ -7,7 +7,12 @@ import {
   fetchBillPayments,
   fetchVehicleMaintenance,
   fetchOfficeMaintenance,
-  fetchActivityLogs
+  fetchActivityLogs,
+  fetchRoomOccupancy,
+  fetchProjects,
+  fetchVendors,
+  fetchTickets,
+  fetchStaffDirectory
 } from '../lib/supabaseService.js';
 import { MaintenancePieChart } from '../components/charts/MaintenancePieChart.jsx';
 import { BillsBarChart } from '../components/charts/BillsBarChart.jsx';
@@ -26,7 +31,11 @@ import {
   ArrowRight,
   Activity,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  BedDouble,
+  FolderKanban,
+  Ticket,
+  Briefcase
 } from 'lucide-react';
 
 // ─── KPI Stat Card ─────────────────────────────────────────────────────────
@@ -87,7 +96,12 @@ export const Dashboard = ({ setActivePage }) => {
     officeMaintenance: [],
     bills: [],
     vehicleMaintenance: [],
-    activityLogs: []
+    activityLogs: [],
+    rooms: [],
+    projects: [],
+    vendors: [],
+    tickets: [],
+    staff: []
   });
 
   const loadDashboardData = useCallback(async () => {
@@ -101,14 +115,24 @@ export const Dashboard = ({ setActivePage }) => {
         officeMaintRes,
         billsRes,
         vehicleMaintRes,
-        logsRes
+        logsRes,
+        roomsRes,
+        projectsRes,
+        vendorsRes,
+        ticketsRes,
+        staffRes
       ] = await Promise.all([
         fetchGuests(),
         fetchGHMaintenance(),
         fetchOfficeMaintenance(),
         fetchBillPayments(),
         fetchVehicleMaintenance(),
-        fetchActivityLogs(20)
+        fetchActivityLogs(20),
+        fetchRoomOccupancy(),
+        fetchProjects(),
+        fetchVendors(),
+        fetchTickets(currentUser),
+        fetchStaffDirectory()
       ]);
 
       // Check for critical errors (don't crash on partial failure)
@@ -123,7 +147,12 @@ export const Dashboard = ({ setActivePage }) => {
         officeMaintenance: officeMaintRes.data || [],
         bills: billsRes.data || [],
         vehicleMaintenance: vehicleMaintRes.data || [],
-        activityLogs: logsRes.data || []
+        activityLogs: logsRes.data || [],
+        rooms: roomsRes.data || [],
+        projects: projectsRes.data || [],
+        vendors: vendorsRes.data || [],
+        tickets: ticketsRes.data || [],
+        staff: staffRes.data || []
       });
     } catch (err) {
       setError('Unable to reach the server. Please check your connection and try again.');
@@ -146,8 +175,16 @@ export const Dashboard = ({ setActivePage }) => {
 
   const totalBillsAmount = data.bills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0);
   const vehiclesInRepairCount = data.vehicleMaintenance.filter(v => v.status !== 'Resolved').length;
+  const occupiedRoomsCount = data.rooms.filter(r => r.status === 'Occupied').length;
+  const occupancyPct = data.rooms.length ? Math.round((occupiedRoomsCount / data.rooms.length) * 100) : 0;
+  const activeProjectsCount = data.projects.filter(p => p.status !== 'Completed').length;
+  const activeProjectBudget = data.projects.reduce((acc, p) => acc + (Number(p.budget) || 0), 0);
+  const openTicketsCount = data.tickets.filter(t => t.status !== 'Closed').length;
+  const activeVendorsCount = data.vendors.filter(v => v.status === 'Active').length;
+  const onDutyStaffCount = data.staff.filter(s => s.status === 'On Duty' || s.status === 'In Field').length;
 
   const role = currentUser?.role || 'staff';
+  const isAdminOrSuper = role === 'admin' || role === 'super_admin';
 
   const filteredActivityLogs = data.activityLogs.filter(log => {
     if (role === 'super_admin' || role === 'admin') return true;
@@ -202,6 +239,49 @@ export const Dashboard = ({ setActivePage }) => {
     return hasModulePermission(card.key);
   });
 
+  const adminStatCards = isAdminOrSuper ? [
+    {
+      key: 'room_occupancy',
+      label: 'Suite Occupancy',
+      value: `${occupancyPct}%`,
+      subtext: `${occupiedRoomsCount} of ${data.rooms.length} suites occupied`,
+      icon: BedDouble,
+      iconBg: 'rgba(26, 63, 160, 0.1)',
+      iconColor: 'var(--color-primary)',
+      page: 'room_occupancy'
+    },
+    {
+      key: 'projects',
+      label: 'Active Projects',
+      value: activeProjectsCount,
+      subtext: `GHS ${activeProjectBudget.toLocaleString('en-GH', { maximumFractionDigits: 0 })} total budget`,
+      icon: FolderKanban,
+      iconBg: 'rgba(245, 158, 11, 0.12)',
+      iconColor: '#D97706',
+      page: 'projects'
+    },
+    {
+      key: 'tickets',
+      label: 'Open Support Tickets',
+      value: openTicketsCount,
+      subtext: `${data.tickets.length} total tickets logged`,
+      icon: Ticket,
+      iconBg: 'rgba(239, 68, 68, 0.1)',
+      iconColor: '#EF4444',
+      page: 'tickets'
+    },
+    {
+      key: 'vendors',
+      label: 'Vendors & Workforce',
+      value: `${activeVendorsCount} / ${onDutyStaffCount}`,
+      subtext: `${activeVendorsCount} active vendors · ${onDutyStaffCount} staff on duty`,
+      icon: Briefcase,
+      iconBg: 'rgba(16, 185, 129, 0.1)',
+      iconColor: '#10B981',
+      page: 'vendors'
+    }
+  ] : [];
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
 
@@ -233,6 +313,27 @@ export const Dashboard = ({ setActivePage }) => {
             ))
         }
       </div>
+
+      {/* ─── Admin Operations Stats Grid ───────────────────────────────────── */}
+      {isAdminOrSuper && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+          {loading
+            ? Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={`adm-${i}`} />)
+            : adminStatCards.map(card => (
+                <StatCard
+                  key={card.key}
+                  label={card.label}
+                  value={card.value}
+                  subtext={card.subtext}
+                  icon={card.icon}
+                  iconBg={card.iconBg}
+                  iconColor={card.iconColor}
+                  onClick={() => setActivePage(card.page)}
+                />
+              ))
+          }
+        </div>
+      )}
 
       {/* ─── Main Content Grid (Left: Charts, Right: Recent Activity Card) ─── */}
       <div className="dashboard-main-grid">

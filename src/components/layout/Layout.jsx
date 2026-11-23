@@ -258,18 +258,6 @@ export const Layout = ({ activePage, setActivePage, children }) => {
             {React.cloneElement(children, { searchQuery, triggerExportModal, triggerImportModal, setToast })}
           </PageTransition>
         </main>
-
-        {/* Footer */}
-        <footer style={{
-          padding: '1rem 1.5rem',
-          borderTop: '1px solid var(--border-color)',
-          textAlign: 'center',
-          fontSize: '0.8125rem',
-          color: 'var(--text-muted)',
-          backgroundColor: 'var(--bg-card)'
-        }}>
-          <span>MTA Ghana © 2026 • All Rights Reserved</span>
-        </footer>
       </div>
 
       {/* ─── Notification Drawer ────────────────────────────────────────────── */}

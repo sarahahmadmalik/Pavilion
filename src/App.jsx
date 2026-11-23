@@ -15,16 +15,35 @@ import { Tickets } from './pages/Tickets.jsx';
 import { ActivityLog } from './pages/ActivityLog.jsx';
 import { UserManagement } from './pages/UserManagement.jsx';
 import { ProfileSettings } from './pages/ProfileSettings.jsx';
+import { ExecutiveAnalytics } from './pages/ExecutiveAnalytics.jsx';
+import { ProjectsBoard } from './pages/ProjectsBoard.jsx';
+import { VendorHub } from './pages/VendorHub.jsx';
+import { StaffDirectory } from './pages/StaffDirectory.jsx';
+import { DocumentVault } from './pages/DocumentVault.jsx';
+import { RoomOccupancy } from './pages/RoomOccupancy.jsx';
+import { CommunityEvents } from './pages/CommunityEvents.jsx';
+import { TeamChat } from './pages/TeamChat.jsx';
 import { PageLoader } from './components/common/Loader.jsx';
 import { ProtectedRoute } from './components/common/ProtectedRoute.jsx';
+import { ErrorBoundary } from './components/common/ErrorBoundary.jsx';
+import { NotFound } from './pages/NotFound.jsx';
 
 const MainContent = () => {
   const { currentUser, authLoading } = useAuth();
   const [activePage, setActivePage] = useState('dashboard');
+  const isUnknownPath = window.location.pathname !== '/' && window.location.pathname !== '/index.html';
+
+  if (isUnknownPath) {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-page)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <NotFound onGoHome={() => { window.history.replaceState(null, '', '/'); window.location.reload(); }} />
+      </div>
+    );
+  }
 
   // Show full-page loader while Supabase checks the session
   if (authLoading) {
-    return <PageLoader message="Initializing MTA Ghana Portal..." />;
+    return <PageLoader message="Initializing PAVILION Portal..." />;
   }
 
   if (!currentUser) {
@@ -85,10 +104,54 @@ const MainContent = () => {
         );
       case 'tickets':
         return <Tickets />;
+      case 'analytics':
+        return (
+          <ProtectedRoute moduleKey="analytics" moduleName="Executive Analytics">
+            <ExecutiveAnalytics />
+          </ProtectedRoute>
+        );
+      case 'projects':
+        return (
+          <ProtectedRoute moduleKey="projects" moduleName="Projects & Task Board">
+            <ProjectsBoard />
+          </ProtectedRoute>
+        );
+      case 'vendors':
+        return (
+          <ProtectedRoute moduleKey="vendors" moduleName="Vendor & Contract Hub">
+            <VendorHub />
+          </ProtectedRoute>
+        );
+      case 'staff_directory':
+        return (
+          <ProtectedRoute moduleKey="staff_directory" moduleName="Staff & HR Directory">
+            <StaffDirectory />
+          </ProtectedRoute>
+        );
+      case 'documents':
+        return (
+          <ProtectedRoute moduleKey="documents" moduleName="Document & Policy Vault">
+            <DocumentVault />
+          </ProtectedRoute>
+        );
+      case 'room_occupancy':
+        return (
+          <ProtectedRoute moduleKey="room_occupancy" moduleName="Suites & Room Occupancy">
+            <RoomOccupancy />
+          </ProtectedRoute>
+        );
+      case 'community_events':
+        return (
+          <ProtectedRoute moduleKey="community_events" moduleName="Notices & Community Events">
+            <CommunityEvents />
+          </ProtectedRoute>
+        );
+      case 'team_chat':
+        return <TeamChat />;
       case 'profile':
         return <ProfileSettings />;
       default:
-        return <Dashboard setActivePage={setActivePage} />;
+        return <NotFound onGoHome={() => setActivePage('dashboard')} />;
     }
   };
 
@@ -101,13 +164,15 @@ const MainContent = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <MainContent />
-        </NotificationProvider>
-      </AuthProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <MainContent />
+          </NotificationProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

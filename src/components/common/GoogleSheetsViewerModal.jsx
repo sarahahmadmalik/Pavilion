@@ -121,7 +121,7 @@ export const GoogleSheetsViewerModal = ({ isOpen, onClose, data = [], columns = 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
           <span>Total exported rows: {data.length}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Lock size={12} /> Encrypted MTA Ghana Cloud Storage
+            <Lock size={12} /> Encrypted PAVILION Cloud Storage
           </span>
         </div>
       </div>

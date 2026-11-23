@@ -1,13 +1,14 @@
-/**
+﻿/**
  * supabaseService.js
  * ==================
- * All Supabase database operations for MTA Ghana.
+ * All Supabase database operations for PAVILION.
  * Each function returns { data, error }.
  * Column mapping: camelCase JS ↔ snake_case Postgres.
  */
 
 import { supabase } from './supabase.js';
 import { sanitizeInput, sanitizeFormData } from './securityUtils.js';
+import { toFriendlyError } from './errorMessages.js';
 
 // ─── Helper: log an activity ─────────────────────────────────────────────────
 async function logActivity(currentUser, action, moduleName, recordAffected, details = null) {
@@ -29,15 +30,7 @@ async function logActivity(currentUser, action, moduleName, recordAffected, deta
 // ─── Helper: Normalize Database Errors ────────────────────────────────────────
 function normalizeError(err) {
   if (!err) return null;
-  let msg = err.message || err.error_description;
-  if (typeof msg === 'object') msg = 'Database error occurred.';
-  if (msg === '{}' || msg === '[object Object]' || !msg) msg = 'Database error occurred.';
-  
-  // Custom user-friendly DB constraints
-  if (err.code === '23505') msg = 'A record with this information already exists (Duplicate).';
-  if (err.code === '23503') msg = 'This record is referenced by other data and cannot be modified/deleted.';
-  
-  return { ...err, message: msg };
+  return { message: toFriendlyError(err, 'Unable to complete this request. Please try again.') };
 }
 
 // ─── Normalizer helpers ───────────────────────────────────────────────────────
@@ -903,4 +896,348 @@ export async function bulkUpdateFields(table, ids, fields, currentUser, moduleLa
   const { error } = await supabase.from(table).update(fields).in('id', ids);
   if (!error) await logActivity(currentUser, 'Edited', moduleLabel, `${ids.length} record(s) (bulk)`);
   return { error: normalizeError(error) };
+}
+
+// ─── COMMUNITY PROJECTS & TASKS ───────────────────────────────────────────────
+export async function fetchProjects(searchQuery = '') {
+  let query = supabase.from('projects').select('*').order('created_at', { ascending: false });
+  if (searchQuery?.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`title.ilike.%${t}%,department.ilike.%${t}%,owner.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
+  return { data: (data || []).map(r => ({ ...r, dueDate: r.due_date })), error: normalizeError(error) };
+}
+
+export async function createProject(formData) {
+  const clean = sanitizeFormData(formData);
+  const payload = {
+    title: clean.title,
+    department: clean.department,
+    owner: clean.owner,
+    priority: clean.priority,
+    status: clean.status,
+    progress: Number(clean.progress) || 0,
+    due_date: clean.dueDate || null,
+    budget: Number(clean.budget) || 0
+  };
+  const { data, error } = await supabase.from('projects').insert(payload).select().single();
+  return { data: data ? { ...data, dueDate: data.due_date } : null, error: normalizeError(error) };
+}
+
+export async function updateProject(id, formData) {
+  const { data, error } = await supabase.from('projects').update(sanitizeFormData(formData)).eq('id', id).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function deleteProject(id) {
+  const { error } = await supabase.from('projects').delete().eq('id', id);
+  return { error: normalizeError(error) };
+}
+
+// ─── VENDORS & CONTRACTS ──────────────────────────────────────────────────────
+export async function fetchVendors(searchQuery = '') {
+  let query = supabase.from('vendors').select('*').order('created_at', { ascending: false });
+  if (searchQuery?.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`name.ilike.%${t}%,category.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
+  return {
+    data: (data || []).map(r => ({
+      ...r,
+      slaScore: r.sla_score,
+      annualSpend: r.annual_spend,
+      renewalDate: r.renewal_date
+    })),
+    error: normalizeError(error)
+  };
+}
+
+export async function createVendor(formData) {
+  const clean = sanitizeFormData(formData);
+  const payload = {
+    name: clean.name,
+    category: clean.category,
+    contact: clean.contact,
+    phone: clean.phone,
+    status: clean.status,
+    sla_score: Number(clean.slaScore) || 95,
+    annual_spend: Number(clean.annualSpend) || 0,
+    renewal_date: clean.renewalDate || null
+  };
+  const { data, error } = await supabase.from('vendors').insert(payload).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function deleteVendor(id) {
+  const { error } = await supabase.from('vendors').delete().eq('id', id);
+  return { error: normalizeError(error) };
+}
+
+// ─── COMMUNITY STAFF DIRECTORY ────────────────────────────────────────────────
+export async function fetchStaffDirectory(searchQuery = '') {
+  let query = supabase.from('staff_directory').select('*').order('created_at', { ascending: false });
+  if (searchQuery?.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`name.ilike.%${t}%,role.ilike.%${t}%,department.ilike.%${t}%,location.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
+  return { data: data || [], error: normalizeError(error) };
+}
+
+export async function createStaffMember(formData) {
+  const { data, error } = await supabase.from('staff_directory').insert(sanitizeFormData(formData)).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+// ─── DOCUMENT & POLICY VAULT ──────────────────────────────────────────────────
+export async function fetchDocuments(searchQuery = '') {
+  let query = supabase.from('documents').select('*').order('created_at', { ascending: false });
+  if (searchQuery?.trim()) {
+    const t = searchQuery.trim();
+    query = query.or(`title.ilike.%${t}%,category.ilike.%${t}%,owner.ilike.%${t}%`);
+  }
+  const { data, error } = await query;
+  return { data: (data || []).map(r => ({ ...r, updatedAt: r.updated_at })), error: normalizeError(error) };
+}
+
+export async function createDocument(formData) {
+  const clean = sanitizeFormData(formData);
+  const payload = {
+    title: clean.title,
+    category: clean.category,
+    owner: clean.owner,
+    size: clean.size || '1.0 MB',
+    status: clean.status || 'Approved',
+    summary: clean.summary,
+    updated_at: clean.updatedAt || new Date().toISOString().split('T')[0]
+  };
+  const { data, error } = await supabase.from('documents').insert(payload).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function deleteDocument(id) {
+  const { error } = await supabase.from('documents').delete().eq('id', id);
+  return { error: normalizeError(error) };
+}
+
+// ─── SUITES & ROOM OCCUPANCY ──────────────────────────────────────────────────
+export async function fetchRoomOccupancy() {
+  const { data, error } = await supabase.from('room_occupancy').select('*').order('name', { ascending: true });
+  return {
+    data: (data || []).map(r => ({ ...r, checkOut: r.check_out })),
+    error: normalizeError(error)
+  };
+}
+
+export async function createRoomSuite(formData) {
+  const clean = sanitizeFormData(formData);
+  const payload = {
+    name: clean.name,
+    wing: clean.wing,
+    capacity: Number(clean.capacity) || 2,
+    status: clean.status || 'Available',
+    guest: clean.guest || null,
+    check_out: clean.checkOut || 'Ready Now',
+    housekeeping: clean.housekeeping || 'Inspected',
+    amenities: clean.amenities || ''
+  };
+  const { data, error } = await supabase.from('room_occupancy').insert(payload).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function updateRoomSuite(id, patch) {
+  const payload = sanitizeFormData({ ...patch });
+  if ('checkOut' in payload) {
+    payload.check_out = payload.checkOut;
+    delete payload.checkOut;
+  }
+  const { data, error } = await supabase.from('room_occupancy').update(payload).eq('id', id).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+// ─── COMMUNITY NOTICES & EVENTS ───────────────────────────────────────────────
+export async function fetchCommunityEvents() {
+  const { data, error } = await supabase.from('community_events').select('*').order('date', { ascending: true });
+  return { data: data || [], error: normalizeError(error) };
+}
+
+export async function createCommunityEvent(formData) {
+  const { data, error } = await supabase.from('community_events').insert(sanitizeFormData(formData)).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function updateCommunityEvent(id, patch) {
+  const { data, error } = await supabase.from('community_events').update(sanitizeFormData(patch)).eq('id', id).select().single();
+  return { data, error: normalizeError(error) };
+}
+
+// ─── SECURE TEAM CHAT (Admin & Staff only; Super Admin excluded) ──────────────
+const CHAT_ALLOWED_TYPES = new Set([
+  'image/png', 'image/jpeg', 'image/webp', 'image/gif',
+  'application/pdf', 'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+]);
+const CHAT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+async function getChatAttachmentSignedUrl(filePath) {
+  if (!filePath) return null;
+  const { data } = await supabase.storage.from('chat-attachments').createSignedUrl(filePath, 3600);
+  return data?.signedUrl || null;
+}
+
+export async function fetchChatPeers(currentUserId) {
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, email, role, avatar, status')
+    .in('role', ['admin', 'staff'])
+    .neq('id', currentUserId)
+    .order('name', { ascending: true });
+  return { data: data || [], error: normalizeError(error) };
+}
+
+export async function fetchChatOverview(currentUserId) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .or(`sender_id.eq.${currentUserId},recipient_id.eq.${currentUserId}`)
+    .order('created_at', { ascending: false })
+    .limit(300);
+  return { data: data || [], error: normalizeError(error) };
+}
+
+export async function fetchChatMessages(currentUserId, peerId) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*')
+    .or(
+      `and(sender_id.eq.${currentUserId},recipient_id.eq.${peerId}),and(sender_id.eq.${peerId},recipient_id.eq.${currentUserId})`
+    )
+    .order('created_at', { ascending: true });
+
+  if (error) return { data: [], error: normalizeError(error) };
+
+  const hydrated = await Promise.all(
+    (data || []).map(async (m) => ({
+      ...m,
+      attachmentUrl: m.attachment_path ? await getChatAttachmentSignedUrl(m.attachment_path) : null
+    }))
+  );
+  return { data: hydrated, error: null };
+}
+
+export async function markChatMessagesDelivered(currentUserId, senderId = null) {
+  let query = supabase
+    .from('chat_messages')
+    .update({ delivered_at: new Date().toISOString() })
+    .eq('recipient_id', currentUserId)
+    .is('delivered_at', null);
+
+  if (senderId) query = query.eq('sender_id', senderId);
+  const { error } = await query;
+  return { error: normalizeError(error) };
+}
+
+export async function markChatMessagesRead(currentUserId, senderId) {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('chat_messages')
+    .update({ read_at: now, delivered_at: now })
+    .eq('recipient_id', currentUserId)
+    .eq('sender_id', senderId)
+    .is('read_at', null);
+  return { error: normalizeError(error) };
+}
+
+export async function sendChatMessage({ sender, recipient, body, file }) {
+  if (!sender || sender.role === 'super_admin') {
+    return { data: null, error: { message: 'Team chat is available only for Admin and Staff accounts.' } };
+  }
+  if (!recipient || recipient.role === 'super_admin') {
+    return { data: null, error: { message: 'Selected user is not eligible for team chat.' } };
+  }
+
+  const cleanBody = sanitizeInput(body || '');
+  if (!cleanBody && !file) {
+    return { data: null, error: { message: 'Please enter a message or attach a file.' } };
+  }
+
+  let attachmentMeta = {};
+  if (file) {
+    if (!CHAT_ALLOWED_TYPES.has(file.type)) {
+      return { data: null, error: { message: 'Unsupported file type. Please attach an image, PDF, or Office document.' } };
+    }
+    if (file.size > CHAT_MAX_BYTES) {
+      return { data: null, error: { message: 'Attachment exceeds the 10 MB size limit.' } };
+    }
+
+    const safeName = sanitizeInput(file.name).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const storagePath = `${sender.id}/${Date.now()}-${safeName}`;
+    const { error: uploadErr } = await supabase.storage
+      .from('chat-attachments')
+      .upload(storagePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadErr) {
+      return { data: null, error: normalizeError(uploadErr) };
+    }
+
+    attachmentMeta = {
+      attachment_name: safeName,
+      attachment_path: storagePath,
+      attachment_type: file.type,
+      attachment_size: file.size
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .insert({
+      sender_id: sender.id,
+      recipient_id: recipient.id,
+      body: cleanBody || null,
+      ...attachmentMeta
+    })
+    .select()
+    .single();
+
+  if (error || !data) {
+    return { data: null, error: normalizeError(error) };
+  }
+
+  // In-app notification for recipient (triggers realtime bell + chime)
+  const previewText = cleanBody
+    ? cleanBody.slice(0, 110)
+    : `Sent an attachment: ${attachmentMeta.attachment_name}`;
+
+  await supabase.from('notifications').insert({
+    user_id: recipient.id,
+    title: `Message from ${sender.name}`,
+    message: previewText
+  });
+
+  // Best-effort email notification via Edge Function
+  try {
+    await supabase.functions.invoke('send-chat-email', {
+      body: {
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
+        senderName: sender.name,
+        preview: previewText
+      }
+    });
+  } catch {
+    // Email notification is best-effort
+  }
+
+  return {
+    data: {
+      ...data,
+      attachmentUrl: data.attachment_path ? await getChatAttachmentSignedUrl(data.attachment_path) : null
+    },
+    error: null
+  };
 }

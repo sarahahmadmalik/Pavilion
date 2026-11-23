@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { RefreshCw, WifiOff, AlertTriangle } from 'lucide-react';
+import { BrandLogo } from './BrandLogo.jsx';
 
 const shimmerStyle = {
   background: 'linear-gradient(90deg, var(--bg-card-hover) 25%, var(--border-color) 50%, var(--bg-card-hover) 75%)',
@@ -14,102 +15,89 @@ const progressBarKeyframes = `@keyframes progressBarGlow { 0% { background-posit
 const logoPulseKeyframes = `@keyframes logoPulse { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.04); opacity: 1; } }`;
 
 /**
- * PageLoader — Full-page splash loader on refresh/session load.
- * Displays MTA Ghana Logo, animated glowing progress bar, and automatic connection issue recovery banner.
+ * PageLoader — Minimal architectural sketch-in splash loader.
+ * Displays ONLY the PAVILION geometric mark sketching itself in + PAVILION wordmark.
  */
-export const PageLoader = ({ message = 'Initializing MTA Ghana Portal...' }) => {
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    // If loading takes > 7 seconds, present connection retry option
-    const timer = setTimeout(() => {
-      setShowTimeoutWarning(true);
-    }, 7000);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-      clearTimeout(timer);
-    };
-  }, []);
-
-  const handleReload = () => {
-    window.location.reload();
-  };
-
+export const PageLoader = () => {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      backgroundColor: 'var(--bg-page)', padding: '2rem', gap: '1.5rem'
+      backgroundColor: 'var(--bg-page)', padding: '2rem'
     }}>
-      {/* Logo */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center'
-      }}>
-        <img
-          src="/logo.png"
-          alt="MTA Ghana Logo"
-          style={{ width: '80px', height: '80px', objectFit: 'contain', filter: 'drop-shadow(0 4px 12px rgba(26,63,160,0.18))' }}
-          onError={(e) => { e.currentTarget.style.display = 'none'; }}
-        />
-      </div>
+      <style>{`
+        @keyframes pavilionSketchOuter {
+          0% { stroke-dashoffset: 160; fill-opacity: 0; }
+          45% { stroke-dashoffset: 0; fill-opacity: 0; }
+          70% { stroke-dashoffset: 0; fill-opacity: 1; }
+          90% { stroke-dashoffset: 0; fill-opacity: 1; opacity: 1; }
+          100% { stroke-dashoffset: 160; fill-opacity: 0; opacity: 0.4; }
+        }
+        @keyframes pavilionSketchCore {
+          0%, 20% { stroke-dashoffset: 48; fill-opacity: 0; transform: scale(0.85); }
+          55% { stroke-dashoffset: 0; fill-opacity: 0; transform: scale(1); }
+          75%, 90% { stroke-dashoffset: 0; fill-opacity: 1; transform: scale(1); }
+          100% { stroke-dashoffset: 48; fill-opacity: 0; transform: scale(0.85); }
+        }
+        @keyframes pavilionWordReveal {
+          0%, 15% { opacity: 0.25; transform: translateY(3px); }
+          55%, 88% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0.25; transform: translateY(3px); }
+        }
+      `}</style>
 
-      {/* Theme-Adaptive Active Progress Bar */}
-      <div style={{ width: '100%', maxWidth: '240px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.625rem' }}>
-        <div style={{
-          width: '100%', height: '4px', borderRadius: '10px',
-          backgroundColor: 'var(--border-color)', overflow: 'hidden', position: 'relative'
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.55rem', userSelect: 'none' }}>
+        <svg
+          width={44}
+          height={44}
+          viewBox="10 10 44 44"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ flexShrink: 0 }}
+        >
+          <path
+            d="M12 12H42V22H22V42H12V12Z"
+            fill="#1A3FA0"
+            stroke="#1A3FA0"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            strokeDasharray="160"
+            style={{ animation: 'pavilionSketchOuter 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite' }}
+          />
+          <path
+            d="M52 52H22V42H42V22H52V52Z"
+            fill="#3B82F6"
+            stroke="#3B82F6"
+            strokeWidth="1.6"
+            strokeLinejoin="round"
+            strokeDasharray="160"
+            style={{ animation: 'pavilionSketchOuter 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite', animationDelay: '0.12s' }}
+          />
+          <rect
+            x="27"
+            y="27"
+            width="10"
+            height="10"
+            fill="#60A5FA"
+            stroke="#60A5FA"
+            strokeWidth="1.4"
+            strokeDasharray="48"
+            style={{ animation: 'pavilionSketchCore 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
+          />
+        </svg>
+
+        <span style={{
+          fontSize: '1.4rem',
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          color: 'var(--text-main)',
+          lineHeight: 1,
+          animation: 'pavilionWordReveal 2.4s ease-in-out infinite'
         }}>
-          <div style={{
-            width: '100%', height: '100%',
-            background: 'linear-gradient(90deg, var(--color-primary), #3B82F6, var(--color-primary-hover), var(--color-primary))',
-            backgroundSize: '300% 300%',
-            animation: 'progressBarGlow 2s ease infinite'
-          }} />
-        </div>
-        <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-          {isOffline ? 'Offline - Waiting for internet...' : 'Loading...'}
+          PAVILION
         </span>
       </div>
-
-      {/* Connection Issue Retry Card */}
-      {(showTimeoutWarning || isOffline) && (
-        <div style={{
-          marginTop: '1rem', padding: '1rem 1.25rem', borderRadius: 'var(--radius-md)',
-          backgroundColor: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem',
-          maxWidth: '340px', textAlign: 'center', animation: 'fadeIn 0.3s ease'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#DC2626', fontWeight: 700, fontSize: '0.875rem' }}>
-            {isOffline ? <WifiOff size={18} /> : <AlertTriangle size={18} />}
-            <span>{isOffline ? 'No Internet Connection' : 'Connection Taking Longer Than Usual'}</span>
-          </div>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-            {isOffline
-              ? 'Please check your network settings and reconnect to the internet.'
-              : 'The database server is slow to respond. Please check your connection or retry.'
-            }
-          </p>
-          <button
-            onClick={handleReload}
-            className="btn btn-primary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginTop: '0.25rem' }}
-          >
-            <RefreshCw size={14} /> Retry Connection
-          </button>
-        </div>
-      )}
-
-      <style>{`${spinKeyframes} ${progressBarKeyframes} ${logoPulseKeyframes}`}</style>
     </div>
   );
 };

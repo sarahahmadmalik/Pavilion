@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase.js';
+import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { fetchUserProfile, fetchAllUsers } from '../lib/supabaseService.js';
+import { toFriendlyError } from '../lib/errorMessages.js';
 
 const AuthContext = createContext();
 
@@ -19,6 +20,11 @@ export const AuthProvider = ({ children }) => {
   // ── Bootstrap: restore session on page load ─────────────────────────────
   useEffect(() => {
     let mounted = true;
+
+    if (!isSupabaseConfigured()) {
+      setAuthLoading(false);
+      return () => { mounted = false; };
+    }
 
     const initSession = async () => {
       try {
@@ -70,40 +76,36 @@ export const AuthProvider = ({ children }) => {
         const { data: allUsers } = await fetchAllUsers();
         setUsers(allUsers || []);
       }
+      return { ok: true };
     }
+    return { ok: false, error };
   };
 
   // ── Login via Supabase Auth ──────────────────────────────────────────────
   const login = async (email, password) => {
-    try {
-      // 1. Pre-check if email exists in public.users
-      const { data: userRecords, error: checkErr } = await supabase
-        .from('users')
-        .select('email, role, id')
-        .ilike('email', email);
-        
-      if (!checkErr && (!userRecords || userRecords.length === 0)) {
-        return { success: false, message: 'Account with this email does not exist.' };
-      }
+    if (!isSupabaseConfigured()) {
+      return { success: false, message: 'Backend not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.' };
+    }
 
-      // 2. Attempt Supabase Auth Login
+    try {
+      // Attempt Supabase Auth Login directly (avoids unauthenticated email enumeration on public.users)
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        let msg = error.message;
-        if (typeof msg === 'object') msg = 'Invalid credentials.';
-        
-        // Handle specific Supabase Auth errors
-        if (error.status === 500) {
-           msg = 'Server Error (500): The authentication database is currently unreachable or corrupted.';
-        } else if (msg === '{}' || msg === '[object Object]' || !msg || msg.includes('Invalid login credentials')) {
-           msg = 'Invalid password. Please try again.';
-        } else if (msg === 'Failed to fetch') {
-           msg = 'Network error: Cannot connect to authentication server.';
-        }
-        return { success: false, message: msg };
+        return {
+          success: false,
+          message: toFriendlyError(error, 'Unable to sign in right now. Please check your credentials and try again.')
+        };
       }
       
+      const profileRes = await loadUserProfile(data.user.id);
+      if (!profileRes?.ok) {
+        return {
+          success: false,
+          message: 'Signed in, but your user profile could not be loaded. Please ensure database RLS policies are applied.'
+        };
+      }
+
       return { success: true, user: data.user };
     } catch (err) {
       return { success: false, message: 'An unexpected error occurred during login.' };

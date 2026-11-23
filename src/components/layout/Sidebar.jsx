@@ -84,7 +84,7 @@ export const Sidebar = ({
     {
       label: 'Communication & Admin',
       items: [
-        { key: 'team_chat', label: 'Team Chat', icon: MessageSquare, permission: true, badge: currentUser?.role !== 'super_admin' ? chatUnreadCount : 0 },
+        { key: 'team_chat', label: 'Team Chat', icon: MessageSquare, permission: currentUser?.role !== 'super_admin', badge: chatUnreadCount },
         { key: 'tickets', label: 'Support Tickets', icon: Ticket, permission: true, badge: ticketUnreadCount },
         { key: 'activity_log', label: 'Activity Log', icon: ClipboardList, permission: currentUser?.role !== 'staff' },
         { key: 'user_management', label: 'User Management', icon: ShieldCheck, permission: currentUser?.role === 'super_admin' }
@@ -111,12 +111,12 @@ export const Sidebar = ({
           display: 'flex',
           alignItems: 'center',
           gap: '0.8125rem',
-          padding: isCollapsed ? '0.75rem 0' : '0.625rem 0.875rem',
-          borderRadius: '9px',
+          padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+          borderRadius: '8px',
           backgroundColor: isActive ? ACTIVE_BG : 'transparent',
           color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
           fontWeight: isActive ? 600 : 400,
-          fontSize: '0.875rem',
+          fontSize: '0.84rem',
           border: 'none',
           cursor: 'pointer',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
@@ -224,7 +224,7 @@ export const Sidebar = ({
 
         {/* ── Logo Header ── */}
         <div style={{
-          height: '80px',
+          height: '68px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
@@ -289,12 +289,12 @@ export const Sidebar = ({
         {/* ── Navigation ── */}
         <nav style={{
           flex: 1,
-          padding: '0.85rem 0.625rem',
+          padding: '0.5rem 0.5rem',
           overflowY: 'auto',
           overflowX: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          gap: '4px'
+          gap: '2px'
         }}>
           {navCategories.map((cat, idx) => {
             const visibleItems = cat.items.filter(i => i.permission);
@@ -305,8 +305,8 @@ export const Sidebar = ({
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.5rem',
-                    margin: isCollapsed ? '0.65rem 0 0.2rem' : '0.85rem 0.25rem 0.2rem',
+                    gap: '0.45rem',
+                    margin: isCollapsed ? '0.45rem 0 0.15rem' : '0.55rem 0.25rem 0.15rem',
                     flexShrink: 0
                   }}>
                     <div style={{ flex: isCollapsed ? '1' : '0 0 10px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />

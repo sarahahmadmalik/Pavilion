@@ -103,7 +103,7 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             : <Sun size={18} color="#F59E0B" />}
         </button>
 
-        {/* Team Chat Icon Button — visible to Admin & Staff */}
+        {/* Team Chat Icon Button — Admin & Staff only */}
         {currentUser?.role !== 'super_admin' && (
           <button
             onClick={() => setActivePage('team_chat')}

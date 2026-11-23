@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { BrandLogo } from '../common/BrandLogo.jsx';
+import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
 import {
   LayoutDashboard,
   Users,
@@ -39,33 +40,56 @@ export const Sidebar = ({
   setIsMobileOpen
 }) => {
   const { currentUser, hasModulePermission, logout } = useAuth();
-  const { notifications } = useNotifications() || {};
+  const { notifications, chatUnreadCount = 0 } = useNotifications() || {};
   const [logoHovered, setLogoHovered] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const ticketUnreadCount = (notifications || []).filter(n => n.ticket_id && !n.is_read).length;
 
-  const mainItems = [
-    { key: 'dashboard',          label: 'Dashboard',            icon: LayoutDashboard, permission: true },
-    { key: 'analytics',          label: 'Community Analytics',  icon: BarChart3,       permission: hasModulePermission('analytics') },
-    { key: 'room_occupancy',     label: 'Suites & Occupancy',   icon: BedDouble,       permission: hasModulePermission('room_occupancy') },
-    { key: 'guest_list',         label: 'Guest House List',     icon: Users,           permission: hasModulePermission('guest_list') },
-    { key: 'gh_maintenance',     label: 'GH Maintenance',       icon: Wrench,          permission: hasModulePermission('gh_maintenance') },
-    { key: 'gh_inventory',       label: 'GH Inventory',         icon: Package,         permission: hasModulePermission('gh_inventory') },
-    { key: 'office_bills',       label: 'Office Bill Payments', icon: CreditCard,      permission: hasModulePermission('office_bills') },
-    { key: 'vehicles_maintenance',label: 'Vehicles Maint',       icon: Car,             permission: hasModulePermission('vehicles_maintenance') },
-    { key: 'office_maintenance', label: 'Office Maintenance',   icon: Wrench,          permission: hasModulePermission('office_maintenance') }
-  ];
-
-  const managementItems = [
-    { key: 'projects',           label: 'Community Projects',   icon: FolderKanban,    permission: hasModulePermission('projects') },
-    { key: 'community_events',   label: 'Notices & Events',     icon: Megaphone,       permission: hasModulePermission('community_events') },
-    { key: 'vendors',            label: 'Vendors & Contracts',  icon: Briefcase,       permission: hasModulePermission('vendors') },
-    { key: 'staff_directory',    label: 'Community Staff',      icon: Contact,         permission: hasModulePermission('staff_directory') },
-    { key: 'documents',          label: 'Document Vault',       icon: FileText,        permission: hasModulePermission('documents') },
-    { key: 'team_chat',          label: 'Team Chat',            icon: MessageSquare,   permission: currentUser?.role !== 'super_admin' },
-    { key: 'tickets',            label: 'Support Tickets',      icon: Ticket,          permission: true, badge: ticketUnreadCount },
-    { key: 'activity_log',       label: 'Activity Log',         icon: ClipboardList,   permission: currentUser?.role !== 'staff' },
-    { key: 'user_management',    label: 'User Management',      icon: ShieldCheck,     permission: currentUser?.role === 'super_admin' }
+  const navCategories = [
+    {
+      label: null,
+      items: [
+        { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, permission: true },
+        { key: 'analytics', label: 'Community Analytics', icon: BarChart3, permission: hasModulePermission('analytics') }
+      ]
+    },
+    {
+      label: 'Guest House',
+      items: [
+        { key: 'room_occupancy', label: 'Suites & Occupancy', icon: BedDouble, permission: hasModulePermission('room_occupancy') },
+        { key: 'guest_list', label: 'Guest House List', icon: Users, permission: hasModulePermission('guest_list') },
+        { key: 'gh_maintenance', label: 'GH Maintenance', icon: Wrench, permission: hasModulePermission('gh_maintenance') },
+        { key: 'gh_inventory', label: 'GH Inventory', icon: Package, permission: hasModulePermission('gh_inventory') }
+      ]
+    },
+    {
+      label: 'Community & Fleet',
+      items: [
+        { key: 'office_bills', label: 'Office Bill Payments', icon: CreditCard, permission: hasModulePermission('office_bills') },
+        { key: 'vehicles_maintenance', label: 'Vehicles Maint', icon: Car, permission: hasModulePermission('vehicles_maintenance') },
+        { key: 'office_maintenance', label: 'Office Maintenance', icon: Wrench, permission: hasModulePermission('office_maintenance') },
+        { key: 'projects', label: 'Community Projects', icon: FolderKanban, permission: hasModulePermission('projects') },
+        { key: 'community_events', label: 'Notices & Events', icon: Megaphone, permission: hasModulePermission('community_events') }
+      ]
+    },
+    {
+      label: 'People & Governance',
+      items: [
+        { key: 'vendors', label: 'Vendors & Contracts', icon: Briefcase, permission: hasModulePermission('vendors') },
+        { key: 'staff_directory', label: 'Community Staff', icon: Contact, permission: hasModulePermission('staff_directory') },
+        { key: 'documents', label: 'Document Vault', icon: FileText, permission: hasModulePermission('documents') }
+      ]
+    },
+    {
+      label: 'Communication & Admin',
+      items: [
+        { key: 'team_chat', label: 'Team Chat', icon: MessageSquare, permission: currentUser?.role !== 'super_admin', badge: chatUnreadCount },
+        { key: 'tickets', label: 'Support Tickets', icon: Ticket, permission: true, badge: ticketUnreadCount },
+        { key: 'activity_log', label: 'Activity Log', icon: ClipboardList, permission: currentUser?.role !== 'staff' },
+        { key: 'user_management', label: 'User Management', icon: ShieldCheck, permission: currentUser?.role === 'super_admin' }
+      ]
+    }
   ];
 
   const handleNavClick = (key) => {
@@ -155,7 +179,11 @@ export const Sidebar = ({
   };
 
   const handleSignOut = () => {
-    logout();
+    setShowSignOutConfirm(true);
+  };
+
+  const confirmSignOut = async () => {
+    await logout();
     setIsMobileOpen(false);
   };
 
@@ -261,40 +289,46 @@ export const Sidebar = ({
         {/* ── Navigation ── */}
         <nav style={{
           flex: 1,
-          padding: '1rem 0.625rem',
+          padding: '0.85rem 0.625rem',
           overflowY: 'auto',
           overflowX: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           gap: '4px'
         }}>
-          {mainItems.map(renderNavItem)}
-
-          {/* Section divider — Management */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            margin: isCollapsed ? '0.75rem 0 0.25rem' : '1rem 0.25rem 0.25rem',
-            flexShrink: 0
-          }}>
-            <div style={{ flex: isCollapsed ? '1' : '0 0 12px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-            {!isCollapsed && (
-              <span style={{
-                fontSize: '0.625rem',
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                textTransform: 'uppercase',
-                color: '#4B5773',
-                whiteSpace: 'nowrap'
-              }}>
-                Management
-              </span>
-            )}
-            <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-          </div>
-
-          {managementItems.map(renderNavItem)}
+          {navCategories.map((cat, idx) => {
+            const visibleItems = cat.items.filter(i => i.permission);
+            if (visibleItems.length === 0) return null;
+            return (
+              <React.Fragment key={cat.label || idx}>
+                {cat.label && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    margin: isCollapsed ? '0.65rem 0 0.2rem' : '0.85rem 0.25rem 0.2rem',
+                    flexShrink: 0
+                  }}>
+                    <div style={{ flex: isCollapsed ? '1' : '0 0 10px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                    {!isCollapsed && (
+                      <span style={{
+                        fontSize: '0.625rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: '#4B5773',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {cat.label}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                  </div>
+                )}
+                {visibleItems.map(renderNavItem)}
+              </React.Fragment>
+            );
+          })}
         </nav>
 
         {/* ── Sign Out & Collapse Toggle ── */}
@@ -377,6 +411,20 @@ export const Sidebar = ({
           )}
         </div>
       </aside>
+
+      <ConfirmDialog
+        isOpen={showSignOutConfirm}
+        onClose={() => setShowSignOutConfirm(false)}
+        onConfirm={confirmSignOut}
+        title="Confirm Sign Out"
+        headline="Sign out of PAVILION?"
+        message="You will need to sign in again to access your workspace."
+        confirmText="Sign Out"
+        confirmLoadingText="Signing out..."
+        icon={LogOut}
+        confirmIcon={LogOut}
+        danger={false}
+      />
     </>
   );
 };

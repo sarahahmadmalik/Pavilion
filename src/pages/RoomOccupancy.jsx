@@ -86,17 +86,21 @@ export const RoomOccupancy = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-        {Object.keys(counts).map(key => (
-          <button
-            key={key}
-            onClick={() => setFilter(key)}
-            className={filter === key ? 'btn btn-primary' : 'btn btn-secondary'}
-            style={{ padding: '0.42rem 0.85rem', fontSize: '0.78rem' }}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ minWidth: '200px' }}>
+          <select
+            className="form-input"
+            value={filter}
+            onChange={e => setFilter(e.target.value)}
+            aria-label="Filter suites by status"
           >
-            {key} ({counts[key]})
-          </button>
-        ))}
+            {Object.keys(counts).map(key => (
+              <option key={key} value={key}>
+                {key === 'All' ? `All Suites (${counts[key]})` : `${key} (${counts[key]})`}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -201,7 +205,7 @@ export const RoomOccupancy = () => {
             <label className="form-label">Suite / Room Name</label>
             <input className="form-input" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g., Suite 101" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Wing / Building</label>
               <input className="form-input" value={form.wing} onChange={e => setForm({ ...form, wing: e.target.value })} />

@@ -12,7 +12,9 @@ import {
   fetchProjects,
   fetchVendors,
   fetchTickets,
-  fetchStaffDirectory
+  fetchStaffDirectory,
+  fetchCommunityEvents,
+  fetchDocuments
 } from '../lib/supabaseService.js';
 import { MaintenancePieChart } from '../components/charts/MaintenancePieChart.jsx';
 import { BillsBarChart } from '../components/charts/BillsBarChart.jsx';
@@ -101,7 +103,9 @@ export const Dashboard = ({ setActivePage }) => {
     projects: [],
     vendors: [],
     tickets: [],
-    staff: []
+    staff: [],
+    events: [],
+    documents: []
   });
 
   const loadDashboardData = useCallback(async () => {
@@ -120,7 +124,9 @@ export const Dashboard = ({ setActivePage }) => {
         projectsRes,
         vendorsRes,
         ticketsRes,
-        staffRes
+        staffRes,
+        eventsRes,
+        docsRes
       ] = await Promise.all([
         fetchGuests(),
         fetchGHMaintenance(),
@@ -132,7 +138,9 @@ export const Dashboard = ({ setActivePage }) => {
         fetchProjects(),
         fetchVendors(),
         fetchTickets(currentUser),
-        fetchStaffDirectory()
+        fetchStaffDirectory(),
+        fetchCommunityEvents(),
+        fetchDocuments()
       ]);
 
       // Check for critical errors (don't crash on partial failure)
@@ -152,7 +160,9 @@ export const Dashboard = ({ setActivePage }) => {
         projects: projectsRes.data || [],
         vendors: vendorsRes.data || [],
         tickets: ticketsRes.data || [],
-        staff: staffRes.data || []
+        staff: staffRes.data || [],
+        events: eventsRes.data || [],
+        documents: docsRes.data || []
       });
     } catch (err) {
       setError('Unable to reach the server. Please check your connection and try again.');
@@ -518,6 +528,100 @@ export const Dashboard = ({ setActivePage }) => {
           }
         </div>
 
+      </div>
+
+      {/* ─── Platform Modules Overview ─────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+        {/* Upcoming Community Events */}
+        <div
+          onClick={() => setActivePage('community_events')}
+          className="hover-card"
+          style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Upcoming Community Events</h4>
+            <ArrowRight size={15} color="var(--text-muted)" />
+          </div>
+          {data.events.length === 0 ? (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No upcoming events scheduled.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {data.events.slice(0, 3).map(evt => (
+                <div key={evt.id} style={{ padding: '0.55rem 0.7rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-page)', border: '1px solid var(--border-color)' }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{evt.title}</div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{evt.date} · {evt.location}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Active Community Projects */}
+        <div
+          onClick={() => setActivePage('projects')}
+          className="hover-card"
+          style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: '0.75rem'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Active Projects</h4>
+            <ArrowRight size={15} color="var(--text-muted)" />
+          </div>
+          {data.projects.length === 0 ? (
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>No active projects logged.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {data.projects.filter(p => p.status !== 'Completed').slice(0, 3).map(prj => (
+                <div key={prj.id}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '3px' }}>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '75%' }}>{prj.title}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{prj.progress}%</span>
+                  </div>
+                  <div style={{ height: '6px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden' }}>
+                    <div style={{ width: `${prj.progress}%`, height: '100%', backgroundColor: 'var(--color-primary)' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Vendors, Staff & Governance Vault */}
+        <div
+          style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.65rem'
+          }}
+        >
+          <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Community &amp; Governance</h4>
+          {[
+            { label: 'Preferred Vendors', value: `${activeVendorsCount} Active`, page: 'vendors' },
+            { label: 'Community Staff', value: `${onDutyStaffCount} On Duty / Field`, page: 'staff_directory' },
+            { label: 'Policy & SOP Vault', value: `${data.documents.length} Documents`, page: 'documents' }
+          ].map(row => (
+            <button
+              key={row.label}
+              type="button"
+              onClick={() => setActivePage(row.page)}
+              style={{
+                width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-md)',
+                border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-page)', cursor: 'pointer'
+              }}
+            >
+              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{row.label}</span>
+              <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary)' }}>{row.value}</span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

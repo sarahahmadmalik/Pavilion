@@ -1110,6 +1110,24 @@ export async function fetchChatOverview(currentUserId) {
   return { data: data || [], error: normalizeError(error) };
 }
 
+export async function fetchWorkspaceMessages() {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .select('*, sender:users!chat_messages_sender_id_fkey(id, name, role, avatar)')
+    .eq('channel', 'workspace')
+    .order('created_at', { ascending: true });
+
+  if (error) return { data: [], error: normalizeError(error) };
+
+  const hydrated = await Promise.all(
+    (data || []).map(async (m) => ({
+      ...m,
+      attachmentUrl: m.attachment_path ? await getChatAttachmentSignedUrl(m.attachment_path) : null
+    }))
+  );
+  return { data: hydrated, error: null };
+}
+
 export async function fetchChatMessages(currentUserId, peerId) {
   const { data, error } = await supabase
     .from('chat_messages')
@@ -1153,11 +1171,11 @@ export async function markChatMessagesRead(currentUserId, senderId) {
   return { error: normalizeError(error) };
 }
 
-export async function sendChatMessage({ sender, recipient, body, file }) {
+export async function sendChatMessage({ sender, recipient, channel = 'dm', body, file }) {
   if (!sender || sender.role === 'super_admin') {
     return { data: null, error: { message: 'Team chat is available only for Admin and Staff accounts.' } };
   }
-  if (!recipient || recipient.role === 'super_admin') {
+  if (channel === 'dm' && (!recipient || recipient.role === 'super_admin')) {
     return { data: null, error: { message: 'Selected user is not eligible for team chat.' } };
   }
 
@@ -1196,8 +1214,9 @@ export async function sendChatMessage({ sender, recipient, body, file }) {
   const { data, error } = await supabase
     .from('chat_messages')
     .insert({
+      channel,
       sender_id: sender.id,
-      recipient_id: recipient.id,
+      recipient_id: channel === 'workspace' ? null : recipient.id,
       body: cleanBody || null,
       ...attachmentMeta
     })
@@ -1208,29 +1227,30 @@ export async function sendChatMessage({ sender, recipient, body, file }) {
     return { data: null, error: normalizeError(error) };
   }
 
-  // In-app notification for recipient (triggers realtime bell + chime)
-  const previewText = cleanBody
-    ? cleanBody.slice(0, 110)
-    : `Sent an attachment: ${attachmentMeta.attachment_name}`;
+  // In-app + email notification for DM recipient
+  if (channel === 'dm' && recipient) {
+    const previewText = cleanBody
+      ? cleanBody.slice(0, 110)
+      : `Sent an attachment: ${attachmentMeta.attachment_name}`;
 
-  await supabase.from('notifications').insert({
-    user_id: recipient.id,
-    title: `Message from ${sender.name}`,
-    message: previewText
-  });
-
-  // Best-effort email notification via Edge Function
-  try {
-    await supabase.functions.invoke('send-chat-email', {
-      body: {
-        recipientEmail: recipient.email,
-        recipientName: recipient.name,
-        senderName: sender.name,
-        preview: previewText
-      }
+    await supabase.from('notifications').insert({
+      user_id: recipient.id,
+      title: `Message from ${sender.name}`,
+      message: previewText
     });
-  } catch {
-    // Email notification is best-effort
+
+    try {
+      await supabase.functions.invoke('send-chat-email', {
+        body: {
+          recipientEmail: recipient.email,
+          recipientName: recipient.name,
+          senderName: sender.name,
+          preview: previewText
+        }
+      });
+    } catch {
+      // Email notification is best-effort
+    }
   }
 
   return {

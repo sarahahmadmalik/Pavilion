@@ -142,7 +142,7 @@ export const CommunityEvents = () => {
             <label className="form-label">Title</label>
             <input className="form-input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g., Community Garden Renovation" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Category</label>
               <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -156,7 +156,7 @@ export const CommunityEvents = () => {
               <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Date</label>
               <input type="date" className="form-input" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />

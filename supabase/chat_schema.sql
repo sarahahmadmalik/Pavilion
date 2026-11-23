@@ -5,8 +5,9 @@
 
 CREATE TABLE IF NOT EXISTS public.chat_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  channel TEXT NOT NULL DEFAULT 'dm' CHECK (channel IN ('workspace', 'dm')),
   sender_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-  recipient_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  recipient_id UUID REFERENCES public.users(id) ON DELETE CASCADE,
   body TEXT,
   attachment_name TEXT,
   attachment_path TEXT,
@@ -19,6 +20,9 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
     (body IS NOT NULL AND length(trim(body)) > 0) OR attachment_path IS NOT NULL
   )
 );
+
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'dm';
+ALTER TABLE public.chat_messages ALTER COLUMN recipient_id DROP NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_pair ON public.chat_messages(sender_id, recipient_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_recipient_unread ON public.chat_messages(recipient_id, read_at);
@@ -44,7 +48,11 @@ CREATE POLICY "Chat read own conversations" ON public.chat_messages
   FOR SELECT TO authenticated
   USING (
     public.is_chat_eligible()
-    AND (sender_id = auth.uid() OR recipient_id = auth.uid())
+    AND (
+      channel = 'workspace'
+      OR sender_id = auth.uid()
+      OR recipient_id = auth.uid()
+    )
   );
 
 DROP POLICY IF EXISTS "Chat send to eligible peer" ON public.chat_messages;
@@ -53,10 +61,17 @@ CREATE POLICY "Chat send to eligible peer" ON public.chat_messages
   WITH CHECK (
     public.is_chat_eligible()
     AND sender_id = auth.uid()
-    AND recipient_id <> auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM public.users
-      WHERE id = recipient_id AND role IN ('admin', 'staff')
+    AND (
+      (channel = 'workspace' AND recipient_id IS NULL)
+      OR (
+        channel = 'dm'
+        AND recipient_id IS NOT NULL
+        AND recipient_id <> auth.uid()
+        AND EXISTS (
+          SELECT 1 FROM public.users
+          WHERE id = recipient_id AND role IN ('admin', 'staff')
+        )
+      )
     )
   );
 

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { fetchVendors, createVendor, deleteVendor } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { Plus, Search, Trash2, Award, Phone, Mail, Calendar } from 'lucide-react';
 
 export const VendorHub = () => {
   const [vendors, setVendors] = useState([]);
   const [search, setSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
@@ -129,7 +131,7 @@ export const VendorHub = () => {
               </div>
 
               <button
-                onClick={() => handleDelete(v.id)}
+                onClick={() => setDeleteTarget(v)}
                 title="Remove Vendor"
                 style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px' }}
               >
@@ -146,7 +148,7 @@ export const VendorHub = () => {
             <label className="form-label">Company Name</label>
             <input className="form-input" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g., Atelier HVAC Partners" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Category</label>
               <input className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
@@ -159,7 +161,7 @@ export const VendorHub = () => {
               </select>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Email</label>
               <input type="email" className="form-input" required value={form.contact} onChange={e => setForm({ ...form, contact: e.target.value })} />
@@ -169,7 +171,7 @@ export const VendorHub = () => {
               <input className="form-input" required value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-3">
             <div>
               <label className="form-label">SLA (%)</label>
               <input type="number" max="100" min="0" className="form-input" value={form.slaScore} onChange={e => setForm({ ...form, slaScore: e.target.value })} />
@@ -189,6 +191,17 @@ export const VendorHub = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget.id);
+        }}
+        title="Remove Vendor"
+        headline={`Remove "${deleteTarget?.name}"?`}
+        message="This will permanently remove the vendor record and SLA history."
+      />
     </div>
   );
 };

@@ -15,7 +15,8 @@ const progressBarKeyframes = `@keyframes progressBarGlow { 0% { background-posit
 const logoPulseKeyframes = `@keyframes logoPulse { 0%, 100% { transform: scale(1); opacity: 0.95; } 50% { transform: scale(1.04); opacity: 1; } }`;
 
 /**
- * PageLoader — Sleek moving-squares platform loader with PAVILION wordmark.
+ * PageLoader — Signature PAVILION brand loader (Slack/Figma style).
+ * Animates the actual PAVILION logo geometry smoothly separating and snapping back together.
  */
 export const PageLoader = () => {
   return (
@@ -23,51 +24,66 @@ export const PageLoader = () => {
       position: 'fixed', inset: 0, zIndex: 99999,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center',
-      backgroundColor: 'var(--bg-page)', padding: '2rem', gap: '1.15rem'
+      backgroundColor: 'var(--bg-page)', padding: '2rem', gap: '1rem'
     }}>
       <style>{`
-        @keyframes sqMove1 {
-          0%, 100% { transform: translate(0, 0); opacity: 1; }
-          25% { transform: translate(20px, 0); opacity: 0.85; }
-          50% { transform: translate(20px, 20px); opacity: 1; }
-          75% { transform: translate(0, 20px); opacity: 0.85; }
+        @keyframes pavilionAssembleA {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          35% { transform: translate(-5px, -5px) scale(0.94); }
+          65% { transform: translate(2px, 2px) scale(1.02); }
         }
-        @keyframes sqMove2 {
-          0%, 100% { transform: translate(20px, 0); opacity: 0.85; }
-          25% { transform: translate(20px, 20px); opacity: 1; }
-          50% { transform: translate(0, 20px); opacity: 0.85; }
-          75% { transform: translate(0, 0); opacity: 1; }
+        @keyframes pavilionAssembleB {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          35% { transform: translate(5px, 5px) scale(0.94); }
+          65% { transform: translate(-2px, -2px) scale(1.02); }
         }
-        @keyframes sqMove3 {
-          0%, 100% { transform: translate(20px, 20px); opacity: 1; }
-          25% { transform: translate(0, 20px); opacity: 0.85; }
-          50% { transform: translate(0, 0); opacity: 1; }
-          75% { transform: translate(20px, 0); opacity: 0.85; }
-        }
-        @keyframes sqMove4 {
-          0%, 100% { transform: translate(0, 20px); opacity: 0.75; }
-          25% { transform: translate(0, 0); opacity: 1; }
-          50% { transform: translate(20px, 0); opacity: 0.75; }
-          75% { transform: translate(20px, 20px); opacity: 1; }
+        @keyframes pavilionCoreSpin {
+          0%, 100% { transform: rotate(0deg) scale(1); opacity: 1; }
+          35% { transform: rotate(45deg) scale(0.75); opacity: 0.7; }
+          70% { transform: rotate(90deg) scale(1.08); opacity: 1; }
         }
       `}</style>
 
-      <div style={{ position: 'relative', width: '36px', height: '36px' }}>
-        <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '4px', backgroundColor: '#1A3FA0', animation: 'sqMove1 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
-        <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '4px', backgroundColor: '#3B82F6', animation: 'sqMove2 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
-        <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '4px', backgroundColor: '#60A5FA', animation: 'sqMove3 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
-        <span style={{ position: 'absolute', width: '14px', height: '14px', borderRadius: '4px', backgroundColor: '#93C5FD', animation: 'sqMove4 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite' }} />
-      </div>
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.6rem', userSelect: 'none' }}>
+        <svg
+          width={44}
+          height={44}
+          viewBox="6 6 52 52"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ flexShrink: 0, overflow: 'visible' }}
+        >
+          <path
+            d="M12 12H42V22H22V42H12V12Z"
+            fill="#1A3FA0"
+            style={{ animation: 'pavilionAssembleA 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
+          />
+          <path
+            d="M52 52H22V42H42V22H52V52Z"
+            fill="#3B82F6"
+            style={{ animation: 'pavilionAssembleB 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
+          />
+          <rect
+            x="27"
+            y="27"
+            width="10"
+            height="10"
+            rx="1.5"
+            fill="#60A5FA"
+            style={{ animation: 'pavilionCoreSpin 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite', transformOrigin: '32px 32px' }}
+          />
+        </svg>
 
-      <span style={{
-        fontSize: '1.125rem',
-        fontWeight: 800,
-        letterSpacing: '0.18em',
-        color: 'var(--text-main)',
-        lineHeight: 1
-      }}>
-        PAVILION
-      </span>
+        <span style={{
+          fontSize: '1.35rem',
+          fontWeight: 800,
+          letterSpacing: '0.14em',
+          color: 'var(--text-main)',
+          lineHeight: 1
+        }}>
+          PAVILION
+        </span>
+      </div>
     </div>
   );
 };

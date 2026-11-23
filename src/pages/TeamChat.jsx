@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase.js';
 import {
   fetchChatPeers,
   fetchChatOverview,
+  fetchWorkspaceMessages,
   fetchChatMessages,
   sendChatMessage,
   markChatMessagesDelivered,
@@ -21,13 +22,14 @@ import {
   FileText,
   Download,
   MessageSquare,
-  Lock
+  Lock,
+  Hash,
+  ArrowLeft
 } from 'lucide-react';
 
 function formatShortTime(ts) {
   if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatBytes(bytes) {
@@ -37,11 +39,14 @@ function formatBytes(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
+const WORKSPACE_TARGET = { id: 'workspace', name: 'Community Workspace', isWorkspace: true };
+
 export const TeamChat = () => {
   const { currentUser } = useAuth();
   const [peers, setPeers] = useState([]);
   const [overview, setOverview] = useState([]);
-  const [selectedPeer, setSelectedPeer] = useState(null);
+  const [selectedTarget, setSelectedTarget] = useState(WORKSPACE_TARGET);
+  const [mobileView, setMobileView] = useState('list'); // 'list' | 'thread'
   const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState('');
@@ -52,13 +57,12 @@ export const TeamChat = () => {
 
   const bottomRef = useRef(null);
   const fileInputRef = useRef(null);
-  const selectedPeerRef = useRef(null);
+  const selectedRef = useRef(selectedTarget);
 
   useEffect(() => {
-    selectedPeerRef.current = selectedPeer;
-  }, [selectedPeer]);
+    selectedRef.current = selectedTarget;
+  }, [selectedTarget]);
 
-  // Block Super Admin from Team Chat
   if (currentUser?.role === 'super_admin') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
@@ -68,7 +72,7 @@ export const TeamChat = () => {
               Team Chat
             </h2>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-              Direct messaging between Admin and Staff members.
+              Workspace &amp; direct messaging for Admin and Staff members.
             </p>
           </div>
         </div>
@@ -103,22 +107,30 @@ export const TeamChat = () => {
     setPeers(peersRes.data || []);
     setOverview(overviewRes.data || []);
     setLoadingPeers(false);
-
-    // Mark any incoming messages to currentUser as delivered
     await markChatMessagesDelivered(currentUser.id);
   }, [currentUser?.id]);
 
-  const loadConversation = useCallback(async (peer) => {
-    if (!currentUser?.id || !peer?.id) return;
-    const { data, error: msgErr } = await fetchChatMessages(currentUser.id, peer.id);
+  const loadConversation = useCallback(async (target) => {
+    if (!currentUser?.id || !target) return;
+    if (target.isWorkspace) {
+      const { data, error: wsErr } = await fetchWorkspaceMessages();
+      if (wsErr) {
+        setError(wsErr.message);
+        return;
+      }
+      setMessages(data || []);
+      return;
+    }
+
+    const { data, error: msgErr } = await fetchChatMessages(currentUser.id, target.id);
     if (msgErr) {
       setError(msgErr.message);
       return;
     }
     setMessages(data || []);
-    await markChatMessagesRead(currentUser.id, peer.id);
+    await markChatMessagesRead(currentUser.id, target.id);
     setOverview(prev => prev.map(m =>
-      m.sender_id === peer.id && m.recipient_id === currentUser.id && !m.read_at
+      m.sender_id === target.id && m.recipient_id === currentUser.id && !m.read_at
         ? { ...m, read_at: new Date().toISOString(), delivered_at: m.delivered_at || new Date().toISOString() }
         : m
     ));
@@ -129,16 +141,15 @@ export const TeamChat = () => {
   }, [loadPeersAndOverview]);
 
   useEffect(() => {
-    if (selectedPeer) {
-      loadConversation(selectedPeer);
+    if (selectedTarget) {
+      loadConversation(selectedTarget);
     }
-  }, [selectedPeer, loadConversation]);
+  }, [selectedTarget, loadConversation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Realtime subscription for incoming messages & receipt updates
   useEffect(() => {
     if (!currentUser?.id) return;
     const channel = supabase
@@ -149,21 +160,21 @@ export const TeamChat = () => {
         async (payload) => {
           const row = payload.new;
           if (!row) return;
-          const involvesMe = row.sender_id === currentUser.id || row.recipient_id === currentUser.id;
+          const isWorkspaceMsg = row.channel === 'workspace';
+          const involvesMe = isWorkspaceMsg || row.sender_id === currentUser.id || row.recipient_id === currentUser.id;
           if (!involvesMe) return;
 
-          // Update overview
           const ov = await fetchChatOverview(currentUser.id);
           if (!ov.error) setOverview(ov.data || []);
 
-          // Mark delivered if I'm the recipient
-          if (payload.eventType === 'INSERT' && row.recipient_id === currentUser.id && !row.delivered_at) {
+          if (!isWorkspaceMsg && payload.eventType === 'INSERT' && row.recipient_id === currentUser.id && !row.delivered_at) {
             await markChatMessagesDelivered(currentUser.id, row.sender_id);
           }
 
-          // If active conversation matches, refresh thread & mark read
-          const active = selectedPeerRef.current;
-          if (active && (row.sender_id === active.id || row.recipient_id === active.id)) {
+          const active = selectedRef.current;
+          if (active?.isWorkspace && isWorkspaceMsg) {
+            await loadConversation(active);
+          } else if (active && !active.isWorkspace && (row.sender_id === active.id || row.recipient_id === active.id)) {
             await loadConversation(active);
           }
         }
@@ -175,16 +186,22 @@ export const TeamChat = () => {
     };
   }, [currentUser?.id, loadConversation]);
 
+  const handleSelectTarget = (target) => {
+    setSelectedTarget(target);
+    setMobileView('thread');
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
-    if (!selectedPeer || sending) return;
+    if (!selectedTarget || sending) return;
     if (!draft.trim() && !attachment) return;
 
     setError('');
     setSending(true);
     const { data, error: sendErr } = await sendChatMessage({
       sender: currentUser,
-      recipient: selectedPeer,
+      recipient: selectedTarget.isWorkspace ? null : selectedTarget,
+      channel: selectedTarget.isWorkspace ? 'workspace' : 'dm',
       body: draft,
       file: attachment
     });
@@ -198,15 +215,17 @@ export const TeamChat = () => {
     setDraft('');
     setAttachment(null);
     if (data) {
-      setMessages(prev => [...prev, data]);
+      setMessages(prev => [...prev, { ...data, sender: { id: currentUser.id, name: currentUser.name, role: currentUser.role } }]);
       setOverview(prev => [data, ...prev]);
     }
   };
 
   const getPeerMeta = (peerId) => {
     const threadMsgs = overview.filter(m =>
-      (m.sender_id === currentUser.id && m.recipient_id === peerId) ||
-      (m.sender_id === peerId && m.recipient_id === currentUser.id)
+      m.channel !== 'workspace' && (
+        (m.sender_id === currentUser.id && m.recipient_id === peerId) ||
+        (m.sender_id === peerId && m.recipient_id === currentUser.id)
+      )
     );
     const last = threadMsgs[0] || null;
     const unread = threadMsgs.filter(m => m.sender_id === peerId && m.recipient_id === currentUser.id && !m.read_at).length;
@@ -227,7 +246,7 @@ export const TeamChat = () => {
             Team Chat
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Secure direct messaging with delivery receipts, read receipts, and file attachments.
+            Combined workspace channel and private direct messages with delivery &amp; read receipts.
           </p>
         </div>
       </div>
@@ -241,24 +260,18 @@ export const TeamChat = () => {
         />
       )}
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'minmax(250px, 310px) 1fr',
-        backgroundColor: 'var(--bg-card)',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-lg)',
-        boxShadow: 'var(--shadow-sm)',
-        overflow: 'hidden',
-        minHeight: '560px',
-        maxHeight: '72vh'
-      }}>
-        {/* Left: Peers List */}
-        <div style={{
-          borderRight: '1px solid var(--border-color)',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'var(--bg-card)'
-        }}>
+      <div className="team-chat-shell">
+        {/* Left: Channels & Peers */}
+        <div
+          className={mobileView === 'thread' ? 'team-chat-hidden-mobile' : ''}
+          style={{
+            borderRight: '1px solid var(--border-color)',
+            display: 'flex',
+            flexDirection: 'column',
+            backgroundColor: 'var(--bg-card)',
+            minHeight: 0
+          }}
+        >
           <div style={{ padding: '0.85rem', borderBottom: '1px solid var(--border-color)' }}>
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -266,41 +279,75 @@ export const TeamChat = () => {
                 className="form-input"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search team members..."
+                placeholder="Search channels or people..."
                 style={{ paddingLeft: '2.1rem', fontSize: '0.8125rem' }}
               />
             </div>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
+            <div style={{ padding: '0.6rem 1rem 0.35rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Workspace Channel
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSelectTarget(WORKSPACE_TARGET)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.75rem 1rem',
+                border: 'none',
+                borderBottom: '1px solid var(--border-color)',
+                backgroundColor: selectedTarget?.isWorkspace ? 'var(--color-primary-light)' : 'transparent',
+                cursor: 'pointer',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{
+                width: '36px', height: '36px', borderRadius: '10px',
+                backgroundColor: 'var(--color-primary)', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+              }}>
+                <Hash size={17} />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>community-ops</div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Shared team workspace</div>
+              </div>
+            </button>
+
+            <div style={{ padding: '0.75rem 1rem 0.35rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Direct Messages
+            </div>
             {loadingPeers ? (
-              <p style={{ padding: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading team members...</p>
+              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading team members...</p>
             ) : filteredPeers.length === 0 ? (
-              <p style={{ padding: '1.25rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No eligible team members found.</p>
+              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No eligible team members found.</p>
             ) : (
               filteredPeers.map(peer => {
                 const { last, unread } = getPeerMeta(peer.id);
-                const isSelected = selectedPeer?.id === peer.id;
+                const isSelected = !selectedTarget?.isWorkspace && selectedTarget?.id === peer.id;
                 return (
                   <button
                     key={peer.id}
                     type="button"
-                    onClick={() => setSelectedPeer(peer)}
+                    onClick={() => handleSelectTarget(peer)}
                     style={{
                       width: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '0.75rem',
-                      padding: '0.85rem 1rem',
+                      padding: '0.8rem 1rem',
                       border: 'none',
                       borderBottom: '1px solid var(--border-color)',
                       backgroundColor: isSelected ? 'var(--color-primary-light)' : 'transparent',
                       cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'background-color 0.14s ease'
+                      textAlign: 'left'
                     }}
                   >
-                    <UserAvatar name={peer.name} avatarUrl={peer.avatar} size={38} />
+                    <UserAvatar name={peer.name} avatarUrl={peer.avatar} size={36} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -336,22 +383,20 @@ export const TeamChat = () => {
         </div>
 
         {/* Right: Active Thread */}
-        <div style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-page)', minWidth: 0 }}>
-          {!selectedPeer ? (
+        <div
+          className={mobileView === 'list' ? 'team-chat-hidden-mobile' : ''}
+          style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-page)', minWidth: 0, minHeight: 0 }}
+        >
+          {!selectedTarget ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: 'var(--text-muted)', textAlign: 'center', gap: '0.65rem' }}>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <MessageSquare size={24} />
-              </div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Select a conversation</h3>
-              <p style={{ fontSize: '0.8125rem', maxWidth: '300px' }}>
-                Choose an Admin or Staff member on the left to start a secure, encrypted conversation.
-              </p>
+              <MessageSquare size={24} color="var(--color-primary)" />
+              <p style={{ fontSize: '0.875rem' }}>Select a channel or team member to start chatting.</p>
             </div>
           ) : (
             <>
               {/* Thread Header */}
               <div style={{
-                padding: '0.85rem 1.25rem',
+                padding: '0.85rem 1.15rem',
                 backgroundColor: 'var(--bg-card)',
                 borderBottom: '1px solid var(--border-color)',
                 display: 'flex',
@@ -359,25 +404,42 @@ export const TeamChat = () => {
                 justifyContent: 'space-between',
                 gap: '0.75rem'
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <UserAvatar name={selectedPeer.name} avatarUrl={selectedPeer.avatar} size={36} />
-                  <div>
-                    <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>{selectedPeer.name}</div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                      {selectedPeer.role} · {selectedPeer.email}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileView('list')}
+                    className="btn btn-ghost team-chat-back-btn"
+                    style={{ padding: '0.35rem', borderRadius: '8px' }}
+                    title="Back to Conversations"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                  {selectedTarget.isWorkspace ? (
+                    <div style={{ width: '34px', height: '34px', borderRadius: '9px', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Hash size={16} />
+                    </div>
+                  ) : (
+                    <UserAvatar name={selectedTarget.name} avatarUrl={selectedTarget.avatar} size={34} />
+                  )}
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      {selectedTarget.isWorkspace ? '#community-ops' : selectedTarget.name}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: selectedTarget.isWorkspace ? 'none' : 'capitalize' }}>
+                      {selectedTarget.isWorkspace ? 'Combined Admin & Staff Workspace' : `${selectedTarget.role} · ${selectedTarget.email}`}
                     </div>
                   </div>
                 </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                  <Lock size={12} /> Private Channel
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                  <Lock size={12} /> Encrypted
                 </span>
               </div>
 
               {/* Messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1.15rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {messages.length === 0 ? (
                   <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '2rem' }}>
-                    No messages yet. Say hello to {selectedPeer.name}!
+                    No messages yet. Start the conversation!
                   </p>
                 ) : (
                   messages.map(msg => {
@@ -388,12 +450,17 @@ export const TeamChat = () => {
                         key={msg.id}
                         style={{
                           alignSelf: isMine ? 'flex-end' : 'flex-start',
-                          maxWidth: '72%',
+                          maxWidth: '78%',
                           display: 'flex',
                           flexDirection: 'column',
                           alignItems: isMine ? 'flex-end' : 'flex-start'
                         }}
                       >
+                        {selectedTarget.isWorkspace && !isMine && msg.sender?.name && (
+                          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px' }}>
+                            {msg.sender.name}
+                          </span>
+                        )}
                         <div style={{
                           padding: '0.65rem 0.9rem',
                           borderRadius: isMine ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
@@ -444,10 +511,9 @@ export const TeamChat = () => {
                           {msg.body && <div>{msg.body}</div>}
                         </div>
 
-                        {/* Timestamp + Delivery / Read Receipt */}
                         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
                           <span>{formatShortTime(msg.created_at)}</span>
-                          {isMine && (
+                          {isMine && !selectedTarget.isWorkspace && (
                             msg.read_at ? (
                               <span title="Read" style={{ display: 'inline-flex', color: '#3B82F6' }}>
                                 <CheckCheck size={14} />
@@ -533,7 +599,7 @@ export const TeamChat = () => {
                     className="form-input"
                     value={draft}
                     onChange={e => setDraft(e.target.value)}
-                    placeholder={`Message ${selectedPeer.name}...`}
+                    placeholder={selectedTarget.isWorkspace ? 'Message #community-ops...' : `Message ${selectedTarget.name}...`}
                     style={{ flex: 1 }}
                   />
 

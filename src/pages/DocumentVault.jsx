@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchDocuments, createDocument, deleteDocument } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { FileText, Plus, Search, Trash2, Eye, ShieldCheck } from 'lucide-react';
 
 export const DocumentVault = () => {
@@ -8,6 +9,7 @@ export const DocumentVault = () => {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [previewDoc, setPreviewDoc] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     title: '',
@@ -62,8 +64,8 @@ export const DocumentVault = () => {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <div style={{ position: 'relative', minWidth: '240px', flex: '1 1 240px', maxWidth: '340px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ position: 'relative', minWidth: '220px', flex: '1 1 240px', maxWidth: '340px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             className="form-input"
@@ -73,17 +75,17 @@ export const DocumentVault = () => {
             style={{ paddingLeft: '2.35rem' }}
           />
         </div>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {categories.map(c => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={category === c ? 'btn btn-primary' : 'btn btn-secondary'}
-              style={{ padding: '0.42rem 0.85rem', fontSize: '0.78rem' }}
-            >
-              {c}
-            </button>
-          ))}
+        <div style={{ minWidth: '190px' }}>
+          <select
+            className="form-input"
+            value={category}
+            onChange={e => setCategory(e.target.value)}
+            aria-label="Filter by document category"
+          >
+            {categories.map(c => (
+              <option key={c} value={c}>{c === 'All' ? 'All Categories' : c}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -149,7 +151,7 @@ export const DocumentVault = () => {
                   <Eye size={13} /> View
                 </button>
                 <button
-                  onClick={() => handleDelete(doc.id)}
+                  onClick={() => setDeleteTarget(doc)}
                   title="Delete Document"
                   style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                 >
@@ -193,7 +195,7 @@ export const DocumentVault = () => {
             <label className="form-label">Document Title</label>
             <input className="form-input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g., Executive Security Protocol v4.0" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Category</label>
               <select className="form-input" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}>
@@ -218,6 +220,17 @@ export const DocumentVault = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget.id);
+        }}
+        title="Delete Document"
+        headline={`Delete "${deleteTarget?.title}"?`}
+        message="This will permanently remove the document record from the vault."
+      />
     </div>
   );
 };

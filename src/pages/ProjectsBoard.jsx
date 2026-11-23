@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { fetchProjects, createProject, updateProject, deleteProject } from '../lib/supabaseService.js';
 import { Modal } from '../components/common/Modal.jsx';
+import { ConfirmDialog } from '../components/common/ConfirmDialog.jsx';
 import { Plus, Trash2, Calendar, DollarSign, ArrowRight, CheckCircle2, FolderKanban } from 'lucide-react';
 
 const STAGES = ['Todo', 'In Progress', 'Review', 'Completed'];
@@ -15,6 +16,7 @@ export const ProjectsBoard = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [form, setForm] = useState({
     title: '',
     department: 'Facilities',
@@ -155,7 +157,7 @@ export const ProjectsBoard = () => {
                             Advance <ArrowRight size={12} />
                           </button>
                           <button
-                            onClick={() => handleDelete(proj.id)}
+                            onClick={() => setDeleteTarget(proj)}
                             title="Delete Initiative"
                             style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                           >
@@ -183,7 +185,7 @@ export const ProjectsBoard = () => {
             <label className="form-label">Initiative Title</label>
             <input className="form-input" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g., Executive Lounge Acoustic Upgrade" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Department</label>
               <input className="form-input" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
@@ -193,7 +195,7 @@ export const ProjectsBoard = () => {
               <input className="form-input" value={form.owner} onChange={e => setForm({ ...form, owner: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-3">
             <div>
               <label className="form-label">Priority</label>
               <select className="form-input" value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })}>
@@ -217,6 +219,17 @@ export const ProjectsBoard = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await handleDelete(deleteTarget.id);
+        }}
+        title="Delete Initiative"
+        headline={`Delete "${deleteTarget?.title}"?`}
+        message="This will permanently remove the project from the board."
+      />
     </div>
   );
 };

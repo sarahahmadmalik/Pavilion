@@ -59,8 +59,8 @@ export const StaffDirectory = () => {
       </div>
 
       {/* Filters */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '1.25rem' }}>
-        <div style={{ position: 'relative', minWidth: '260px', flex: '1 1 260px', maxWidth: '360px' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <div style={{ position: 'relative', minWidth: '220px', flex: '1 1 240px', maxWidth: '340px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
           <input
             className="form-input"
@@ -70,17 +70,17 @@ export const StaffDirectory = () => {
             style={{ paddingLeft: '2.35rem' }}
           />
         </div>
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {departments.map(d => (
-            <button
-              key={d}
-              onClick={() => setDeptFilter(d)}
-              className={deptFilter === d ? 'btn btn-primary' : 'btn btn-secondary'}
-              style={{ padding: '0.42rem 0.85rem', fontSize: '0.78rem' }}
-            >
-              {d}
-            </button>
-          ))}
+        <div style={{ minWidth: '190px' }}>
+          <select
+            className="form-input"
+            value={deptFilter}
+            onChange={e => setDeptFilter(e.target.value)}
+            aria-label="Filter by department"
+          >
+            {departments.map(d => (
+              <option key={d} value={d}>{d === 'All' ? 'All Departments' : d}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -142,7 +142,7 @@ export const StaffDirectory = () => {
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Add Team Member">
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Full Name</label>
               <input className="form-input" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
@@ -152,7 +152,7 @@ export const StaffDirectory = () => {
               <input className="form-input" required value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Department</label>
               <input className="form-input" value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
@@ -162,7 +162,7 @@ export const StaffDirectory = () => {
               <input className="form-input" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+          <div className="responsive-form-grid-2">
             <div>
               <label className="form-label">Email</label>
               <input type="email" className="form-input" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />

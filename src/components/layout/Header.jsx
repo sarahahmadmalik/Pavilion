@@ -22,6 +22,7 @@ import {
 } from '../common/AnimatedDropdown.jsx';
 import { GlobalSearchBar } from './GlobalSearchBar.jsx';
 import { UserAvatar } from '../common/UserAvatar.jsx';
+import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
@@ -41,6 +42,7 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
   const { chatUnreadCount = 0 } = useNotifications() || {};
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
 
@@ -298,11 +300,25 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
               icon={<LogOut size={16} />}
               label="Sign Out"
               danger
-              onClick={() => { logout(); setShowProfileMenu(false); }}
+              onClick={() => { setShowProfileMenu(false); setShowSignOutConfirm(true); }}
             />
           </AnimatedDropdown>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={showSignOutConfirm}
+        onClose={() => setShowSignOutConfirm(false)}
+        onConfirm={logout}
+        title="Confirm Sign Out"
+        headline="Sign out of PAVILION?"
+        message="You will need to sign in again to access your workspace."
+        confirmText="Sign Out"
+        confirmLoadingText="Signing out..."
+        icon={LogOut}
+        confirmIcon={LogOut}
+        danger={false}
+      />
     </header>
   );
 };

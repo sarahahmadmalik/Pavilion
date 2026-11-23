@@ -1093,11 +1093,98 @@ async function getChatAttachmentSignedUrl(filePath) {
 export async function fetchChatPeers(currentUserId) {
   const { data, error } = await supabase
     .from('users')
-    .select('id, name, email, role, avatar, status')
+    .select('id, name, email, role, avatar, status, last_seen')
     .in('role', ['admin', 'staff'])
     .neq('id', currentUserId)
     .order('name', { ascending: true });
   return { data: data || [], error: normalizeError(error) };
+}
+
+export async function updateLastSeen(userId) {
+  if (!userId) return;
+  await supabase.from('users').update({ last_seen: new Date().toISOString() }).eq('id', userId);
+}
+
+export async function togglePinChatMessage(messageId, isPinned) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({ is_pinned: !isPinned })
+    .eq('id', messageId)
+    .select()
+    .single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function toggleChatReaction(messageId, emoji, userId, currentReactions = {}) {
+  const next = { ...(currentReactions || {}) };
+  const users = Array.isArray(next[emoji]) ? [...next[emoji]] : [];
+  const idx = users.indexOf(userId);
+  if (idx >= 0) {
+    users.splice(idx, 1);
+  } else {
+    users.push(userId);
+  }
+  if (users.length === 0) {
+    delete next[emoji];
+  } else {
+    next[emoji] = users;
+  }
+
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({ reactions: next })
+    .eq('id', messageId)
+    .select()
+    .single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function deleteChatMessageForMe(messageId, userId, existingDeletedFor = []) {
+  const updated = Array.from(new Set([...(existingDeletedFor || []), userId]));
+  const { error } = await supabase
+    .from('chat_messages')
+    .update({ deleted_for: updated })
+    .eq('id', messageId);
+  return { error: normalizeError(error) };
+}
+
+export async function deleteChatMessageForEveryone(messageId) {
+  const { data, error } = await supabase
+    .from('chat_messages')
+    .update({
+      deleted_for_all: true,
+      body: null,
+      attachment_name: null,
+      attachment_path: null,
+      attachment_type: null,
+      attachment_size: null,
+      is_pinned: false
+    })
+    .eq('id', messageId)
+    .select()
+    .single();
+  return { data, error: normalizeError(error) };
+}
+
+export async function uploadUserAvatar(userId, blob) {
+  if (!userId || !blob) return { url: null, error: { message: 'Missing user or image data.' } };
+  const filePath = `${userId}/avatar-${Date.now()}.jpg`;
+  const { error: uploadErr } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+
+  if (uploadErr) return { url: null, error: normalizeError(uploadErr) };
+
+  const { data: pub } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  const publicUrl = pub?.publicUrl;
+  if (!publicUrl) return { url: null, error: { message: 'Could not generate avatar URL.' } };
+
+  const { error: userErr } = await supabase
+    .from('users')
+    .update({ avatar: publicUrl })
+    .eq('id', userId);
+
+  return { url: publicUrl, error: normalizeError(userErr) };
 }
 
 export async function fetchChatOverview(currentUserId) {

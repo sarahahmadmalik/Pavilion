@@ -9,7 +9,11 @@ import {
   fetchChatMessages,
   sendChatMessage,
   markChatMessagesDelivered,
-  markChatMessagesRead
+  markChatMessagesRead,
+  togglePinChatMessage,
+  toggleChatReaction,
+  deleteChatMessageForMe,
+  deleteChatMessageForEveryone
 } from '../lib/supabaseService.js';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
 import { ErrorBanner } from '../components/common/ErrorBanner.jsx';
@@ -22,15 +26,33 @@ import {
   CheckCheck,
   FileText,
   Download,
-  MessageSquare,
   Lock,
   Hash,
-  ArrowLeft
+  ChevronLeft,
+  Pin,
+  MoreVertical,
+  Smile,
+  Trash2,
+  Image as ImageIcon,
+  Camera,
+  Ban
 } from 'lucide-react';
+
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+const WORKSPACE_TARGET = { id: 'workspace', name: 'Community Workspace', isWorkspace: true };
 
 function formatShortTime(ts) {
   if (!ts) return '';
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatLastSeen(ts) {
+  if (!ts) return 'Offline';
+  const diffMin = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (diffMin < 2) return 'Last seen just now';
+  if (diffMin < 60) return `Last seen ${diffMin}m ago`;
+  if (diffMin < 1440) return `Last seen ${Math.floor(diffMin / 60)}h ago`;
+  return `Last seen ${new Date(ts).toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
 }
 
 function formatBytes(bytes) {
@@ -40,15 +62,13 @@ function formatBytes(bytes) {
   return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-const WORKSPACE_TARGET = { id: 'workspace', name: 'Community Workspace', isWorkspace: true };
-
 export const TeamChat = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, onlineUserIds = [] } = useAuth();
   const { refreshChatUnreadCount } = useNotifications() || {};
   const [peers, setPeers] = useState([]);
   const [overview, setOverview] = useState([]);
   const [selectedTarget, setSelectedTarget] = useState(WORKSPACE_TARGET);
-  const [mobileView, setMobileView] = useState('list'); // 'list' | 'thread'
+  const [mobileView, setMobileView] = useState('list');
   const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
   const [draft, setDraft] = useState('');
@@ -57,22 +77,43 @@ export const TeamChat = () => {
   const [error, setError] = useState('');
   const [loadingPeers, setLoadingPeers] = useState(true);
 
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [openMenuMsgId, setOpenMenuMsgId] = useState(null);
+  const [openReactMsgId, setOpenReactMsgId] = useState(null);
+  const [pinnedConvIds, setPinnedConvIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`pavilion_pinned_chats_${currentUser?.id || 'anon'}`);
+      return saved ? JSON.parse(saved) : ['workspace'];
+    } catch {
+      return ['workspace'];
+    }
+  });
+
   const bottomRef = useRef(null);
-  const fileInputRef = useRef(null);
+  const photoInputRef = useRef(null);
+  const docInputRef = useRef(null);
+  const cameraInputRef = useRef(null);
   const selectedRef = useRef(selectedTarget);
 
   useEffect(() => {
     selectedRef.current = selectedTarget;
   }, [selectedTarget]);
 
+  useEffect(() => {
+    const closeMenus = () => {
+      setOpenMenuMsgId(null);
+      setOpenReactMsgId(null);
+    };
+    window.addEventListener('click', closeMenus);
+    return () => window.removeEventListener('click', closeMenus);
+  }, []);
+
   if (currentUser?.role === 'super_admin') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         <div className="page-header-container">
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-              Team Chat
-            </h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>Team Chat</h2>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
               Workspace &amp; direct messaging for Admin and Staff members.
             </p>
@@ -94,6 +135,19 @@ export const TeamChat = () => {
       </div>
     );
   }
+
+  const togglePinConversation = (e, id) => {
+    e.stopPropagation();
+    setPinnedConvIds(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem(`pavilion_pinned_chats_${currentUser?.id || 'anon'}`, JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const loadPeersAndOverview = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -137,21 +191,17 @@ export const TeamChat = () => {
         ? { ...m, read_at: new Date().toISOString(), delivered_at: m.delivered_at || new Date().toISOString() }
         : m
     ));
-  }, [currentUser?.id]);
+  }, [currentUser?.id, refreshChatUnreadCount]);
+
+  useEffect(() => { loadPeersAndOverview(); }, [loadPeersAndOverview]);
 
   useEffect(() => {
-    loadPeersAndOverview();
-  }, [loadPeersAndOverview]);
-
-  useEffect(() => {
-    if (selectedTarget) {
-      loadConversation(selectedTarget);
-    }
+    if (selectedTarget) loadConversation(selectedTarget);
   }, [selectedTarget, loadConversation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, [messages.length]);
 
   useEffect(() => {
     if (!currentUser?.id) return;
@@ -184,14 +234,13 @@ export const TeamChat = () => {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [currentUser?.id, loadConversation]);
 
   const handleSelectTarget = (target) => {
     setSelectedTarget(target);
     setMobileView('thread');
+    setShowAttachMenu(false);
   };
 
   const handleSend = async (e) => {
@@ -217,50 +266,91 @@ export const TeamChat = () => {
 
     setDraft('');
     setAttachment(null);
+    setShowAttachMenu(false);
     if (data) {
       setMessages(prev => [...prev, { ...data, sender: { id: currentUser.id, name: currentUser.name, role: currentUser.role } }]);
       setOverview(prev => [data, ...prev]);
     }
   };
 
+  const handleReact = async (msg, emoji) => {
+    setOpenReactMsgId(null);
+    setOpenMenuMsgId(null);
+    const { data } = await toggleChatReaction(msg.id, emoji, currentUser.id, msg.reactions);
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, reactions: data.reactions } : m));
+    }
+  };
+
+  const handlePinMsg = async (msg) => {
+    setOpenMenuMsgId(null);
+    const { data } = await togglePinChatMessage(msg.id, msg.is_pinned);
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, is_pinned: data.is_pinned } : m));
+    }
+  };
+
+  const handleDeleteForMe = async (msg) => {
+    setOpenMenuMsgId(null);
+    const { error: delErr } = await deleteChatMessageForMe(msg.id, currentUser.id, msg.deleted_for);
+    if (!delErr) {
+      setMessages(prev => prev.filter(m => m.id !== msg.id));
+    }
+  };
+
+  const handleDeleteForEveryone = async (msg) => {
+    setOpenMenuMsgId(null);
+    const { data } = await deleteChatMessageForEveryone(msg.id);
+    if (data) {
+      setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...data, attachmentUrl: null } : m));
+    }
+  };
+
   const getPeerMeta = (peerId) => {
     const threadMsgs = overview.filter(m =>
-      m.channel !== 'workspace' && (
-        (m.sender_id === currentUser.id && m.recipient_id === peerId) ||
-        (m.sender_id === peerId && m.recipient_id === currentUser.id)
-      )
+      m.channel !== 'workspace' &&
+      !(m.deleted_for || []).includes(currentUser.id) &&
+      ((m.sender_id === currentUser.id && m.recipient_id === peerId) ||
+       (m.sender_id === peerId && m.recipient_id === currentUser.id))
     );
     const last = threadMsgs[0] || null;
     const unread = threadMsgs.filter(m => m.sender_id === peerId && m.recipient_id === currentUser.id && !m.read_at).length;
     return { last, unread };
   };
 
-  const filteredPeers = peers.filter(p =>
-    !search.trim() ||
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredPeers = peers
+    .filter(p =>
+      !search.trim() ||
+      p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.email.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aPin = pinnedConvIds.includes(a.id) ? 1 : 0;
+      const bPin = pinnedConvIds.includes(b.id) ? 1 : 0;
+      return bPin - aPin;
+    });
+
+  const visibleMessages = messages.filter(m => !(m.deleted_for || []).includes(currentUser.id));
+  const pinnedMessages = visibleMessages.filter(m => m.is_pinned && !m.deleted_for_all);
+  const latestPinned = pinnedMessages[pinnedMessages.length - 1] || null;
+
+  const isPeerOnline = selectedTarget && !selectedTarget.isWorkspace && onlineUserIds.includes(selectedTarget.id);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
       <div className="page-header-container">
         <div>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
             Team Chat
           </h2>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-            Combined workspace channel and private direct messages with delivery &amp; read receipts.
+            Workspace channel &amp; encrypted direct messages with live presence, reactions, and pinned messages.
           </p>
         </div>
       </div>
 
       {error && (
-        <ErrorBanner
-          type="error"
-          title="Messaging Notice"
-          message={error}
-          onRetry={loadPeersAndOverview}
-        />
+        <ErrorBanner type="error" title="Messaging Notice" message={error} onRetry={loadPeersAndOverview} />
       )}
 
       <div className="team-chat-shell">
@@ -275,349 +365,533 @@ export const TeamChat = () => {
             minHeight: 0
           }}
         >
-          <div style={{ padding: '0.85rem', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)' }}>
             <div style={{ position: 'relative' }}>
-              <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 className="form-input"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search channels or people..."
-                style={{ paddingLeft: '2.1rem', fontSize: '0.8125rem' }}
+                placeholder="Search chats..."
+                style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: '999px', backgroundColor: 'var(--bg-page)' }}
               />
             </div>
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
-            <div style={{ padding: '0.6rem 1rem 0.35rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Workspace Channel
+            <div style={{ padding: '0.55rem 1rem 0.25rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Workspace
             </div>
-            <button
-              type="button"
+            <div
               onClick={() => handleSelectTarget(WORKSPACE_TARGET)}
               style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                border: 'none',
-                borderBottom: '1px solid var(--border-color)',
+                display: 'flex', alignItems: 'center', gap: '0.75rem',
+                padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)',
                 backgroundColor: selectedTarget?.isWorkspace ? 'var(--color-primary-light)' : 'transparent',
-                cursor: 'pointer',
-                textAlign: 'left'
+                cursor: 'pointer'
               }}
             >
-              <div style={{
-                width: '36px', height: '36px', borderRadius: '10px',
-                backgroundColor: 'var(--color-primary)', color: '#fff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-              }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Hash size={17} />
               </div>
-              <div style={{ minWidth: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>community-ops</div>
-                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Shared team workspace</div>
+                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)' }}>Shared Admin &amp; Staff room</div>
               </div>
-            </button>
+              <button
+                type="button"
+                onClick={(e) => togglePinConversation(e, 'workspace')}
+                title={pinnedConvIds.includes('workspace') ? 'Unpin' : 'Pin'}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: pinnedConvIds.includes('workspace') ? 'var(--color-primary)' : 'var(--text-muted)', padding: '4px' }}
+              >
+                <Pin size={14} />
+              </button>
+            </div>
 
-            <div style={{ padding: '0.75rem 1rem 0.35rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+            <div style={{ padding: '0.65rem 1rem 0.25rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
               Direct Messages
             </div>
             {loadingPeers ? (
-              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading team members...</p>
+              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Loading team...</p>
             ) : filteredPeers.length === 0 ? (
-              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No eligible team members found.</p>
+              <p style={{ padding: '1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>No team members found.</p>
             ) : (
               filteredPeers.map(peer => {
                 const { last, unread } = getPeerMeta(peer.id);
                 const isSelected = !selectedTarget?.isWorkspace && selectedTarget?.id === peer.id;
+                const online = onlineUserIds.includes(peer.id);
+                const isPinned = pinnedConvIds.includes(peer.id);
+
                 return (
-                  <button
+                  <div
                     key={peer.id}
-                    type="button"
                     onClick={() => handleSelectTarget(peer)}
                     style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.8rem 1rem',
-                      border: 'none',
-                      borderBottom: '1px solid var(--border-color)',
+                      display: 'flex', alignItems: 'center', gap: '0.75rem',
+                      padding: '0.75rem 1rem', borderBottom: '1px solid var(--border-color)',
                       backgroundColor: isSelected ? 'var(--color-primary-light)' : 'transparent',
-                      cursor: 'pointer',
-                      textAlign: 'left'
+                      cursor: 'pointer'
                     }}
                   >
-                    <UserAvatar name={peer.name} avatarUrl={peer.avatar} size={36} />
+                    <div style={{ position: 'relative', flexShrink: 0 }}>
+                      <UserAvatar name={peer.name} src={peer.avatar} size={38} />
+                      <span
+                        title={online ? 'Online' : formatLastSeen(peer.last_seen)}
+                        style={{
+                          position: 'absolute', bottom: 0, right: 0,
+                          width: '10px', height: '10px', borderRadius: '50%',
+                          backgroundColor: online ? '#22C55E' : '#94A3B8',
+                          border: '2px solid var(--bg-card)'
+                        }}
+                      />
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem' }}>
                         <span style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {peer.name}
                         </span>
-                        {last && (
-                          <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', flexShrink: 0 }}>
-                            {formatShortTime(last.created_at)}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.4rem', marginTop: '2px' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {last ? (last.body || `Attachment: ${last.attachment_name}`) : `${peer.role === 'admin' ? 'Admin' : 'Staff'}`}
+                        <span style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', flexShrink: 0 }}>
+                          {last ? formatShortTime(last.created_at) : ''}
                         </span>
-                        {unread > 0 && (
-                          <span style={{
-                            minWidth: '18px', height: '18px', padding: '0 5px',
-                            borderRadius: '999px', backgroundColor: 'var(--color-primary)',
-                            color: '#fff', fontSize: '0.6875rem', fontWeight: 700,
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                          }}>
-                            {unread}
-                          </span>
-                        )}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem', marginTop: '2px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {last ? (last.deleted_for_all ? 'Message deleted' : (last.body || `Attachment: ${last.attachment_name}`)) : (online ? 'Online' : formatLastSeen(peer.last_seen))}
+                        </span>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                          {unread > 0 && (
+                            <span style={{
+                              minWidth: '18px', height: '18px', padding: '0 5px', borderRadius: '999px',
+                              backgroundColor: 'var(--color-primary)', color: '#fff', fontSize: '0.6875rem',
+                              fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                            }}>
+                              {unread}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => togglePinConversation(e, peer.id)}
+                            title={isPinned ? 'Unpin chat' : 'Pin chat'}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isPinned ? 'var(--color-primary)' : 'var(--text-muted)', padding: '2px', opacity: isPinned ? 1 : 0.45 }}
+                          >
+                            <Pin size={13} />
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })
             )}
           </div>
         </div>
 
-        {/* Right: Active Thread */}
+        {/* Right: Active Thread (iPhone-style clean layout on mobile) */}
         <div
           className={mobileView === 'list' ? 'team-chat-hidden-mobile' : ''}
-          style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-page)', minWidth: 0, minHeight: 0 }}
+          style={{ display: 'flex', flexDirection: 'column', backgroundColor: 'var(--bg-page)', minWidth: 0, minHeight: 0, position: 'relative' }}
         >
-          {!selectedTarget ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem', color: 'var(--text-muted)', textAlign: 'center', gap: '0.65rem' }}>
-              <MessageSquare size={24} color="var(--color-primary)" />
-              <p style={{ fontSize: '0.875rem' }}>Select a channel or team member to start chatting.</p>
-            </div>
-          ) : (
-            <>
-              {/* Thread Header */}
-              <div style={{
-                padding: '0.85rem 1.15rem',
-                backgroundColor: 'var(--bg-card)',
-                borderBottom: '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '0.75rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', minWidth: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => setMobileView('list')}
-                    className="btn btn-ghost team-chat-back-btn"
-                    style={{ padding: '0.35rem', borderRadius: '8px' }}
-                    title="Back to Conversations"
-                  >
-                    <ArrowLeft size={18} />
-                  </button>
-                  {selectedTarget.isWorkspace ? (
-                    <div style={{ width: '34px', height: '34px', borderRadius: '9px', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Hash size={16} />
-                    </div>
-                  ) : (
-                    <UserAvatar name={selectedTarget.name} avatarUrl={selectedTarget.avatar} size={34} />
-                  )}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {selectedTarget.isWorkspace ? '#community-ops' : selectedTarget.name}
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', textTransform: selectedTarget.isWorkspace ? 'none' : 'capitalize' }}>
-                      {selectedTarget.isWorkspace ? 'Combined Admin & Staff Workspace' : `${selectedTarget.role} · ${selectedTarget.email}`}
-                    </div>
-                  </div>
+          {/* iOS / WhatsApp-style Header */}
+          <div style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: 'var(--bg-card)',
+            borderBottom: '1px solid var(--border-color)',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 0 }}>
+              <button
+                type="button"
+                onClick={() => setMobileView('list')}
+                className="btn btn-ghost team-chat-back-btn"
+                style={{ padding: '0.3rem 0.4rem', borderRadius: '999px', color: 'var(--color-primary)' }}
+                title="Back"
+              >
+                <ChevronLeft size={22} />
+              </button>
+              {selectedTarget.isWorkspace ? (
+                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Hash size={17} />
                 </div>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
-                  <Lock size={12} /> Encrypted
+              ) : (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <UserAvatar name={selectedTarget.name} src={selectedTarget.avatar} size={36} />
+                  <span style={{
+                    position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px',
+                    borderRadius: '50%', backgroundColor: isPeerOnline ? '#22C55E' : '#94A3B8',
+                    border: '2px solid var(--bg-card)'
+                  }} />
+                </div>
+              )}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {selectedTarget.isWorkspace ? '#community-ops' : selectedTarget.name}
+                </div>
+                <div style={{ fontSize: '0.72rem', color: isPeerOnline ? '#16A34A' : 'var(--text-muted)', fontWeight: isPeerOnline ? 600 : 400 }}>
+                  {selectedTarget.isWorkspace ? 'Combined Admin & Staff Workspace' : (isPeerOnline ? 'Online' : formatLastSeen(selectedTarget.last_seen))}
+                </div>
+              </div>
+            </div>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+              <Lock size={12} /> Encrypted
+            </span>
+          </div>
+
+          {/* Pinned Message Banner */}
+          {latestPinned && (
+            <div style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: 'var(--color-primary-light)',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem',
+              fontSize: '0.78rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0 }}>
+                <Pin size={13} color="var(--color-primary)" style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, color: 'var(--color-primary)', flexShrink: 0 }}>Pinned:</span>
+                <span style={{ color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {latestPinned.body || latestPinned.attachment_name}
                 </span>
               </div>
+              <button
+                type="button"
+                onClick={() => handlePinMsg(latestPinned)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: '0.72rem' }}
+              >
+                Unpin
+              </button>
+            </div>
+          )}
 
-              {/* Messages */}
-              <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                {messages.length === 0 ? (
-                  <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '2rem' }}>
-                    No messages yet. Start the conversation!
-                  </p>
-                ) : (
-                  messages.map(msg => {
-                    const isMine = msg.sender_id === currentUser.id;
-                    const isImage = msg.attachment_type?.startsWith('image/');
-                    return (
-                      <div
-                        key={msg.id}
-                        style={{
-                          alignSelf: isMine ? 'flex-end' : 'flex-start',
-                          maxWidth: '78%',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: isMine ? 'flex-end' : 'flex-start'
-                        }}
-                      >
-                        {selectedTarget.isWorkspace && !isMine && msg.sender?.name && (
-                          <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px' }}>
-                            {msg.sender.name}
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {visibleMessages.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '2rem' }}>
+                No messages yet. Start the conversation!
+              </p>
+            ) : (
+              visibleMessages.map(msg => {
+                const isMine = msg.sender_id === currentUser.id;
+                const isImage = msg.attachment_type?.startsWith('image/');
+                const reactionEntries = Object.entries(msg.reactions || {}).filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
+
+                return (
+                  <div
+                    key={msg.id}
+                    className="chat-msg-row"
+                    style={{
+                      alignSelf: isMine ? 'flex-end' : 'flex-start',
+                      maxWidth: '80%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: isMine ? 'flex-end' : 'flex-start',
+                      position: 'relative'
+                    }}
+                  >
+                    {selectedTarget.isWorkspace && !isMine && msg.sender?.name && (
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px' }}>
+                        {msg.sender.name}
+                      </span>
+                    )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}>
+                      {/* Bubble */}
+                      <div style={{
+                        padding: '0.6rem 0.9rem',
+                        borderRadius: isMine ? '18px 18px 4px 18px' : '18px 18px 18px 4px',
+                        backgroundColor: msg.deleted_for_all ? 'var(--bg-card)' : (isMine ? 'var(--color-primary)' : 'var(--bg-card)'),
+                        color: msg.deleted_for_all ? 'var(--text-muted)' : (isMine ? '#FFFFFF' : 'var(--text-main)'),
+                        border: (msg.deleted_for_all || !isMine) ? '1px solid var(--border-color)' : 'none',
+                        boxShadow: 'var(--shadow-sm)',
+                        fontSize: '0.875rem',
+                        lineHeight: 1.45,
+                        wordBreak: 'break-word'
+                      }}>
+                        {msg.deleted_for_all ? (
+                          <span style={{ fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8125rem' }}>
+                            <Ban size={13} /> This message was deleted
                           </span>
+                        ) : (
+                          <>
+                            {msg.is_pinned && (
+                              <div style={{ fontSize: '0.65rem', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
+                                <Pin size={10} /> Pinned
+                              </div>
+                            )}
+                            {msg.attachment_path && (
+                              <div style={{ marginBottom: msg.body ? '0.45rem' : 0 }}>
+                                {isImage && msg.attachmentUrl ? (
+                                  <a href={msg.attachmentUrl} target="_blank" rel="noreferrer">
+                                    <img src={msg.attachmentUrl} alt={msg.attachment_name} style={{ maxWidth: '230px', maxHeight: '180px', borderRadius: '10px', display: 'block', objectFit: 'cover' }} />
+                                  </a>
+                                ) : (
+                                  <a
+                                    href={msg.attachmentUrl || '#'}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                      display: 'inline-flex', alignItems: 'center', gap: '0.45rem',
+                                      padding: '0.45rem 0.65rem', borderRadius: '10px',
+                                      backgroundColor: isMine ? 'rgba(255,255,255,0.16)' : 'var(--bg-page)',
+                                      color: isMine ? '#FFFFFF' : 'var(--text-main)',
+                                      textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600
+                                    }}
+                                  >
+                                    <FileText size={15} />
+                                    <span>{msg.attachment_name}</span>
+                                    {msg.attachment_size && <span style={{ opacity: 0.75 }}>({formatBytes(msg.attachment_size)})</span>}
+                                    <Download size={13} />
+                                  </a>
+                                )}
+                              </div>
+                            )}
+                            {msg.body && <div>{msg.body}</div>}
+                          </>
                         )}
-                        <div style={{
-                          padding: '0.65rem 0.9rem',
-                          borderRadius: isMine ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
-                          backgroundColor: isMine ? 'var(--color-primary)' : 'var(--bg-card)',
-                          color: isMine ? '#FFFFFF' : 'var(--text-main)',
-                          border: isMine ? 'none' : '1px solid var(--border-color)',
-                          boxShadow: 'var(--shadow-sm)',
-                          fontSize: '0.875rem',
-                          lineHeight: 1.45,
-                          wordBreak: 'break-word'
-                        }}>
-                          {msg.attachment_path && (
-                            <div style={{ marginBottom: msg.body ? '0.5rem' : 0 }}>
-                              {isImage && msg.attachmentUrl ? (
-                                <a href={msg.attachmentUrl} target="_blank" rel="noreferrer">
-                                  <img
-                                    src={msg.attachmentUrl}
-                                    alt={msg.attachment_name}
-                                    style={{ maxWidth: '240px', maxHeight: '180px', borderRadius: '8px', display: 'block', objectFit: 'cover' }}
-                                  />
-                                </a>
-                              ) : (
-                                <a
-                                  href={msg.attachmentUrl || '#'}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '0.45rem',
-                                    padding: '0.45rem 0.65rem',
-                                    borderRadius: '8px',
-                                    backgroundColor: isMine ? 'rgba(255,255,255,0.16)' : 'var(--bg-page)',
-                                    color: isMine ? '#FFFFFF' : 'var(--text-main)',
-                                    textDecoration: 'none',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600
-                                  }}
+                      </div>
+
+                      {/* Hover Actions: Emoji + 3-Dots */}
+                      {!msg.deleted_for_all && (
+                        <div
+                          className="chat-msg-actions"
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: '2px',
+                            opacity: (openMenuMsgId === msg.id || openReactMsgId === msg.id) ? 1 : 0,
+                            pointerEvents: (openMenuMsgId === msg.id || openReactMsgId === msg.id) ? 'auto' : 'none',
+                            transition: 'opacity 0.14s ease',
+                            position: 'relative'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => { setOpenReactMsgId(openReactMsgId === msg.id ? null : msg.id); setOpenMenuMsgId(null); }}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+                            title="React"
+                          >
+                            <Smile size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => { setOpenMenuMsgId(openMenuMsgId === msg.id ? null : msg.id); setOpenReactMsgId(null); }}
+                            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '50%', width: '26px', height: '26px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'var(--text-muted)' }}
+                            title="More options"
+                          >
+                            <MoreVertical size={13} />
+                          </button>
+
+                          {/* Emoji Reaction Picker Popover */}
+                          {openReactMsgId === msg.id && (
+                            <div style={{
+                              position: 'absolute', bottom: '32px', [isMine ? 'right' : 'left']: 0, zIndex: 30,
+                              backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                              borderRadius: '999px', padding: '4px 8px', boxShadow: 'var(--shadow-dropdown)',
+                              display: 'flex', gap: '4px', animation: 'popUpMenu 0.14s ease-out'
+                            }}>
+                              {REACTION_EMOJIS.map(em => (
+                                <button
+                                  key={em}
+                                  type="button"
+                                  onClick={() => handleReact(msg, em)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '2px 4px', borderRadius: '50%' }}
                                 >
-                                  <FileText size={15} />
-                                  <span>{msg.attachment_name}</span>
-                                  {msg.attachment_size && <span style={{ opacity: 0.75 }}>({formatBytes(msg.attachment_size)})</span>}
-                                  <Download size={13} />
-                                </a>
+                                  {em}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* 3-Dots Dropdown */}
+                          {openMenuMsgId === msg.id && (
+                            <div style={{
+                              position: 'absolute', bottom: '32px', [isMine ? 'right' : 'left']: 0, zIndex: 30,
+                              minWidth: '175px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                              borderRadius: '10px', padding: '4px', boxShadow: 'var(--shadow-dropdown)',
+                              display: 'flex', flexDirection: 'column', animation: 'popUpMenu 0.14s ease-out'
+                            }}>
+                              <button
+                                type="button"
+                                onClick={() => handlePinMsg(msg)}
+                                className="btn btn-ghost btn-sm"
+                                style={{ justifyContent: 'flex-start', gap: '8px', width: '100%' }}
+                              >
+                                <Pin size={13} /> {msg.is_pinned ? 'Unpin Message' : 'Pin Message'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteForMe(msg)}
+                                className="btn btn-ghost btn-sm"
+                                style={{ justifyContent: 'flex-start', gap: '8px', width: '100%' }}
+                              >
+                                <Trash2 size={13} /> Delete for Me
+                              </button>
+                              {isMine && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteForEveryone(msg)}
+                                  className="btn btn-ghost btn-sm"
+                                  style={{ justifyContent: 'flex-start', gap: '8px', width: '100%', color: '#DC2626' }}
+                                >
+                                  <Trash2 size={13} /> Delete for Everyone
+                                </button>
                               )}
                             </div>
                           )}
-                          {msg.body && <div>{msg.body}</div>}
                         </div>
+                      )}
+                    </div>
 
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
-                          <span>{formatShortTime(msg.created_at)}</span>
-                          {isMine && !selectedTarget.isWorkspace && (
-                            msg.read_at ? (
-                              <span title="Read" style={{ display: 'inline-flex', color: '#3B82F6' }}>
-                                <CheckCheck size={14} />
-                              </span>
-                            ) : msg.delivered_at ? (
-                              <span title="Delivered" style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
-                                <CheckCheck size={14} />
-                              </span>
-                            ) : (
-                              <span title="Sent" style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
-                                <Check size={13} />
-                              </span>
-                            )
-                          )}
-                        </div>
+                    {/* Reactions Pills */}
+                    {reactionEntries.length > 0 && !msg.deleted_for_all && (
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '3px' }}>
+                        {reactionEntries.map(([emoji, users]) => {
+                          const reactedByMe = users.includes(currentUser.id);
+                          return (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() => handleReact(msg, emoji)}
+                              style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                padding: '1px 7px', borderRadius: '999px', fontSize: '0.72rem',
+                                backgroundColor: reactedByMe ? 'var(--color-primary-light)' : 'var(--bg-card)',
+                                border: `1px solid ${reactedByMe ? 'var(--color-primary)' : 'var(--border-color)'}`,
+                                color: 'var(--text-main)', cursor: 'pointer'
+                              }}
+                            >
+                              <span>{emoji}</span>
+                              <span style={{ fontWeight: 700, fontSize: '0.68rem' }}>{users.length}</span>
+                            </button>
+                          );
+                        })}
                       </div>
-                    );
-                  })
-                )}
-                <div ref={bottomRef} />
-              </div>
+                    )}
 
-              {/* Composer */}
-              <form
-                onSubmit={handleSend}
-                style={{
-                  padding: '0.75rem 1rem',
-                  backgroundColor: 'var(--bg-card)',
-                  borderTop: '1px solid var(--border-color)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem'
-                }}
-              >
-                {attachment && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.35rem 0.65rem',
-                    borderRadius: '8px',
-                    backgroundColor: 'var(--color-primary-light)',
-                    color: 'var(--color-primary)',
-                    fontSize: '0.78rem',
-                    fontWeight: 600,
-                    alignSelf: 'flex-start'
-                  }}>
-                    <Paperclip size={13} />
-                    <span>{attachment.name} ({formatBytes(attachment.size)})</span>
-                    <button
-                      type="button"
-                      onClick={() => setAttachment(null)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex' }}
-                    >
-                      <X size={14} />
-                    </button>
+                    {/* Timestamp + Delivery / Read Receipt */}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                      <span>{formatShortTime(msg.created_at)}</span>
+                      {isMine && !selectedTarget.isWorkspace && !msg.deleted_for_all && (
+                        msg.read_at ? (
+                          <span title="Read" style={{ display: 'inline-flex', color: '#3B82F6' }}><CheckCheck size={14} /></span>
+                        ) : msg.delivered_at ? (
+                          <span title="Delivered" style={{ display: 'inline-flex', color: 'var(--text-muted)' }}><CheckCheck size={14} /></span>
+                        ) : (
+                          <span title="Sent" style={{ display: 'inline-flex', color: 'var(--text-muted)' }}><Check size={13} /></span>
+                        )
+                      )}
+                    </div>
                   </div>
-                )}
+                );
+              })
+            )}
+            <div ref={bottomRef} />
+          </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    hidden
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                    onChange={e => {
-                      const f = e.target.files?.[0];
-                      if (f) setAttachment(f);
-                      e.target.value = '';
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn btn-secondary"
-                    title="Attach file (max 10 MB)"
-                    style={{ padding: '0.55rem 0.7rem' }}
-                  >
-                    <Paperclip size={16} />
-                  </button>
+          {/* WhatsApp-Style Animated Attachment Menu + iOS Pill Composer */}
+          <form
+            onSubmit={handleSend}
+            style={{
+              padding: '0.65rem 0.9rem',
+              backgroundColor: 'var(--bg-card)',
+              borderTop: '1px solid var(--border-color)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem',
+              position: 'relative'
+            }}
+          >
+            {showAttachMenu && (
+              <div style={{
+                position: 'absolute', bottom: '62px', left: '12px', zIndex: 25,
+                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+                borderRadius: '14px', padding: '0.55rem', boxShadow: 'var(--shadow-dropdown)',
+                display: 'flex', flexDirection: 'column', gap: '0.35rem', minWidth: '190px',
+                animation: 'popUpMenu 0.18s cubic-bezier(0.16, 1, 0.3, 1)'
+              }}>
+                <button
+                  type="button"
+                  onClick={() => { photoInputRef.current?.click(); setShowAttachMenu(false); }}
+                  className="btn btn-ghost btn-sm"
+                  style={{ justifyContent: 'flex-start', gap: '0.65rem', padding: '0.5rem 0.65rem' }}
+                >
+                  <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(139,92,246,0.14)', color: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ImageIcon size={15} />
+                  </span>
+                  <span>Photos &amp; Videos</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { docInputRef.current?.click(); setShowAttachMenu(false); }}
+                  className="btn btn-ghost btn-sm"
+                  style={{ justifyContent: 'flex-start', gap: '0.65rem', padding: '0.5rem 0.65rem' }}
+                >
+                  <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(59,130,246,0.14)', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FileText size={15} />
+                  </span>
+                  <span>Document</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { cameraInputRef.current?.click(); setShowAttachMenu(false); }}
+                  className="btn btn-ghost btn-sm"
+                  style={{ justifyContent: 'flex-start', gap: '0.65rem', padding: '0.5rem 0.65rem' }}
+                >
+                  <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'rgba(16,185,129,0.14)', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Camera size={15} />
+                  </span>
+                  <span>Camera</span>
+                </button>
+              </div>
+            )}
 
-                  <input
-                    className="form-input"
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    placeholder={selectedTarget.isWorkspace ? 'Message #community-ops...' : `Message ${selectedTarget.name}...`}
-                    style={{ flex: 1 }}
-                  />
+            {attachment && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.5rem',
+                padding: '0.35rem 0.65rem', borderRadius: '999px',
+                backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)',
+                fontSize: '0.78rem', fontWeight: 600, alignSelf: 'flex-start'
+              }}>
+                <Paperclip size={13} />
+                <span>{attachment.name} ({formatBytes(attachment.size)})</span>
+                <button type="button" onClick={() => setAttachment(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              </div>
+            )}
 
-                  <button
-                    type="submit"
-                    disabled={sending || (!draft.trim() && !attachment)}
-                    className="btn btn-primary"
-                    style={{ padding: '0.55rem 1rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                  >
-                    <Send size={15} /> {sending ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
-              </form>
-            </>
-          )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input ref={photoInputRef} type="file" hidden accept="image/*" onChange={e => { if (e.target.files?.[0]) setAttachment(e.target.files[0]); e.target.value = ''; }} />
+              <input ref={docInputRef} type="file" hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.txt" onChange={e => { if (e.target.files?.[0]) setAttachment(e.target.files[0]); e.target.value = ''; }} />
+              <input ref={cameraInputRef} type="file" hidden accept="image/*" capture="environment" onChange={e => { if (e.target.files?.[0]) setAttachment(e.target.files[0]); e.target.value = ''; }} />
+
+              <button
+                type="button"
+                onClick={() => setShowAttachMenu(!showAttachMenu)}
+                className="btn btn-secondary"
+                title="Attach"
+                style={{ padding: '0.55rem', borderRadius: '50%', width: '38px', height: '38px', flexShrink: 0 }}
+              >
+                <Paperclip size={16} />
+              </button>
+
+              <input
+                className="form-input"
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                placeholder={selectedTarget.isWorkspace ? 'Message #community-ops...' : `Message ${selectedTarget.name}...`}
+                style={{ flex: 1, borderRadius: '999px', paddingLeft: '1rem', paddingRight: '1rem' }}
+              />
+
+              <button
+                type="submit"
+                disabled={sending || (!draft.trim() && !attachment)}
+                className="btn btn-primary"
+                style={{ padding: '0.55rem', borderRadius: '50%', width: '38px', height: '38px', flexShrink: 0 }}
+                title="Send"
+              >
+                <Send size={15} />
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

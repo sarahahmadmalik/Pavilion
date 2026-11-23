@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
 
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'dm';
 ALTER TABLE public.chat_messages ALTER COLUMN recipient_id DROP NOT NULL;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS is_pinned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS reactions JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS deleted_for_all BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS deleted_for UUID[] NOT NULL DEFAULT '{}'::uuid[];
+
+-- Track user last seen timestamp for active badges
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_pair ON public.chat_messages(sender_id, recipient_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_recipient_unread ON public.chat_messages(recipient_id, read_at);
@@ -78,8 +85,14 @@ CREATE POLICY "Chat send to eligible peer" ON public.chat_messages
 DROP POLICY IF EXISTS "Chat recipient mark delivered or read" ON public.chat_messages;
 CREATE POLICY "Chat recipient mark delivered or read" ON public.chat_messages
   FOR UPDATE TO authenticated
-  USING (public.is_chat_eligible() AND recipient_id = auth.uid())
-  WITH CHECK (public.is_chat_eligible() AND recipient_id = auth.uid());
+  USING (
+    public.is_chat_eligible()
+    AND (sender_id = auth.uid() OR recipient_id = auth.uid() OR channel = 'workspace')
+  )
+  WITH CHECK (
+    public.is_chat_eligible()
+    AND (sender_id = auth.uid() OR recipient_id = auth.uid() OR channel = 'workspace')
+  );
 
 -- Enable Realtime on chat_messages
 DO $$
@@ -108,3 +121,23 @@ CREATE POLICY "Chat attachment read" ON storage.objects
     bucket_id = 'chat-attachments'
     AND public.is_chat_eligible()
   );
+
+-- Public Storage Bucket for User Profile Avatars
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Avatar upload own" ON storage.objects;
+CREATE POLICY "Avatar upload own" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Avatar update own" ON storage.objects;
+CREATE POLICY "Avatar update own" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'avatars' AND auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "Avatar public read" ON storage.objects;
+CREATE POLICY "Avatar public read" ON storage.objects
+  FOR SELECT TO public
+  USING (bucket_id = 'avatars');

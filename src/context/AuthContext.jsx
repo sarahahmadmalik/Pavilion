@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
-import { fetchUserProfile, fetchAllUsers } from '../lib/supabaseService.js';
+import { fetchUserProfile, fetchAllUsers, updateLastSeen } from '../lib/supabaseService.js';
 import { toFriendlyError } from '../lib/errorMessages.js';
 
 const AuthContext = createContext();
@@ -9,6 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
   const [authLoading, setAuthLoading] = useState(true); // initial session check
+  const [onlineUserIds, setOnlineUserIds] = useState([]);
 
   // Tracks the currently-loaded user id across renders, without re-subscribing
   // the auth listener below — used to ignore redundant SIGNED_IN re-emits.
@@ -16,6 +17,37 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     currentUserIdRef.current = currentUser?.id || null;
   }, [currentUser]);
+
+  // ── Presence & Last Seen Heartbeat ──────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser?.id || !isSupabaseConfigured()) {
+      setOnlineUserIds([]);
+      return;
+    }
+
+    updateLastSeen(currentUser.id);
+    const heartbeat = setInterval(() => updateLastSeen(currentUser.id), 60000);
+
+    const presenceChannel = supabase.channel('online_users', {
+      config: { presence: { key: currentUser.id } }
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        setOnlineUserIds(Object.keys(state));
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ user_id: currentUser.id, online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      clearInterval(heartbeat);
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [currentUser?.id]);
 
   // ── Bootstrap: restore session on page load ─────────────────────────────
   useEffect(() => {
@@ -161,6 +193,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       currentUser,
       users,
+      onlineUserIds,
       authLoading,
       login,
       logout,

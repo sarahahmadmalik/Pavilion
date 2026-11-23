@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
-import { User, Lock, Sun, Moon, ShieldCheck, Mail, KeyRound, ArrowLeft, RefreshCw, Bell, Volume2 } from 'lucide-react';
+import { User, Lock, Sun, Moon, ShieldCheck, Mail, KeyRound, ArrowLeft, RefreshCw, Bell, Volume2, Camera } from 'lucide-react';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
+import { AvatarCropModal } from '../components/common/AvatarCropModal.jsx';
 import { ButtonSpinner } from '../components/common/Loader.jsx';
 import { supabase } from '../lib/supabase.js';
+import { uploadUserAvatar } from '../lib/supabaseService.js';
 import {
   getNotificationPreferences,
   saveNotificationPreferences,
@@ -13,9 +15,23 @@ import {
 import { playNotificationChime, playChatChime } from '../lib/notificationSound.js';
 
 export const ProfileSettings = ({ setToast }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, refreshProfile } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [notifPrefs, setNotifPrefs] = useState(() => getNotificationPreferences());
+  const avatarInputRef = useRef(null);
+  const [cropFile, setCropFile] = useState(null);
+
+  const handleSaveCroppedAvatar = async (blob) => {
+    if (!currentUser?.id || !blob) return;
+    const { error } = await uploadUserAvatar(currentUser.id, blob);
+    if (error) {
+      setToast?.({ type: 'error', message: error.message });
+      return;
+    }
+    await refreshProfile?.();
+    setCropFile(null);
+    setToast?.({ type: 'success', message: 'Profile photo updated!' });
+  };
 
   const handleToggleNotifPref = async (key) => {
     if (key === 'browserNotifications' && !notifPrefs.browserNotifications) {
@@ -165,7 +181,43 @@ export const ProfileSettings = ({ setToast }) => {
 
       {/* Profile Card */}
       <div className="profile-card">
-        <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size={72} border="3px solid var(--color-primary)" />
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <UserAvatar name={currentUser?.name} src={currentUser?.avatar} size={72} border="3px solid var(--color-primary)" />
+          <input
+            ref={avatarInputRef}
+            type="file"
+            hidden
+            accept="image/png,image/jpeg,image/webp"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) setCropFile(file);
+              e.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => avatarInputRef.current?.click()}
+            title="Change Profile Photo"
+            style={{
+              position: 'absolute',
+              bottom: '0',
+              right: '0',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              backgroundColor: 'var(--color-primary)',
+              color: '#fff',
+              border: '2px solid var(--bg-card)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              boxShadow: 'var(--shadow-sm)'
+            }}
+          >
+            <Camera size={14} />
+          </button>
+        </div>
         <div className="profile-card-details" style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
@@ -416,6 +468,12 @@ export const ProfileSettings = ({ setToast }) => {
           </form>
         )}
       </div>
+      <AvatarCropModal
+        isOpen={!!cropFile}
+        onClose={() => setCropFile(null)}
+        imageFile={cropFile}
+        onSave={handleSaveCroppedAvatar}
+      />
     </div>
   );
 };

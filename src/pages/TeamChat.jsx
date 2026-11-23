@@ -604,7 +604,8 @@ export const TeamChat = () => {
                         boxShadow: 'var(--shadow-sm)',
                         fontSize: '0.875rem',
                         lineHeight: 1.45,
-                        wordBreak: 'break-word'
+                        overflowWrap: 'break-word',
+                        wordBreak: 'normal'
                       }}>
                         {msg.deleted_for_all ? (
                           <span style={{ fontStyle: 'italic', display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '0.8125rem' }}>
@@ -878,7 +879,7 @@ export const TeamChat = () => {
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 placeholder={selectedTarget.isWorkspace ? 'Message #community-ops...' : `Message ${selectedTarget.name}...`}
-                style={{ flex: 1, borderRadius: '999px', paddingLeft: '1rem', paddingRight: '1rem' }}
+                style={{ flex: 1, minWidth: 0, borderRadius: '999px', paddingLeft: '1rem', paddingRight: '1rem' }}
               />
 
               <button

@@ -193,7 +193,7 @@ input, select, textarea, button {
 
 .team-chat-shell {
   display: grid;
-  grid-template-columns: minmax(250px, 310px) 1fr;
+  grid-template-columns: minmax(210px, 265px) 1fr;
   background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -217,17 +217,12 @@ input, select, textarea, button {
   pointer-events: auto !important;
 }
 
-@media (max-width: 768px) {
-  .responsive-form-grid-2,
-  .responsive-form-grid-3 {
-    grid-template-columns: 1fr;
-  }
-
+@media (max-width: 900px) {
   .team-chat-shell {
     grid-template-columns: 1fr;
     height: calc(100vh - 150px);
-    min-height: 500px;
-    border-radius: 22px;
+    min-height: 480px;
+    border-radius: 20px;
     border-width: 1px;
   }
 
@@ -237,6 +232,13 @@ input, select, textarea, button {
 
   .team-chat-back-btn {
     display: inline-flex !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .responsive-form-grid-2,
+  .responsive-form-grid-3 {
+    grid-template-columns: 1fr;
   }
 }
 

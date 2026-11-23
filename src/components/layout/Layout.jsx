@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { Sidebar } from './Sidebar.jsx';
@@ -107,8 +107,23 @@ const NotificationCard = ({ notif, onRead, onNavigate }) => {
 
 // ─── Main Layout ──────────────────────────────────────────────────────────────
 export const Layout = ({ activePage, setActivePage, children }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 1180 : false
+  );
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Auto-collapse sidebar on mid-size screens (tablets / small laptops)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 1180 && window.innerWidth > 768) {
+        setIsCollapsed(true);
+      } else if (window.innerWidth > 1180) {
+        setIsCollapsed(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);

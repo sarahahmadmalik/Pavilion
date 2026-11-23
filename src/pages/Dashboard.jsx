@@ -239,48 +239,40 @@ export const Dashboard = ({ setActivePage }) => {
     return hasModulePermission(card.key);
   });
 
-  const adminStatCards = isAdminOrSuper ? [
-    {
-      key: 'room_occupancy',
-      label: 'Suite Occupancy',
-      value: `${occupancyPct}%`,
-      subtext: `${occupiedRoomsCount} of ${data.rooms.length} suites occupied`,
-      icon: BedDouble,
-      iconBg: 'rgba(26, 63, 160, 0.1)',
-      iconColor: 'var(--color-primary)',
-      page: 'room_occupancy'
-    },
-    {
-      key: 'projects',
-      label: 'Active Projects',
-      value: activeProjectsCount,
-      subtext: `GHS ${activeProjectBudget.toLocaleString('en-GH', { maximumFractionDigits: 0 })} total budget`,
-      icon: FolderKanban,
-      iconBg: 'rgba(245, 158, 11, 0.12)',
-      iconColor: '#D97706',
-      page: 'projects'
-    },
-    {
-      key: 'tickets',
-      label: 'Open Support Tickets',
-      value: openTicketsCount,
-      subtext: `${data.tickets.length} total tickets logged`,
-      icon: Ticket,
-      iconBg: 'rgba(239, 68, 68, 0.1)',
-      iconColor: '#EF4444',
+  const needsAttentionItems = [
+    ...(openMaintenanceCount > 0 ? [{
+      label: `${openMaintenanceCount} Open Maintenance Issue${openMaintenanceCount > 1 ? 's' : ''}`,
+      detail: `${inProgressCount} currently in progress across guest house & facilities`,
+      badge: 'Urgent',
+      badgeBg: 'var(--status-red-bg)',
+      badgeColor: 'var(--status-red-text)',
+      page: 'gh_maintenance'
+    }] : []),
+    ...(openTicketsCount > 0 ? [{
+      label: `${openTicketsCount} Unresolved Support Ticket${openTicketsCount > 1 ? 's' : ''}`,
+      detail: 'Awaiting response or resolution from operations team',
+      badge: 'Action',
+      badgeBg: 'var(--status-amber-bg)',
+      badgeColor: 'var(--status-amber-text)',
       page: 'tickets'
-    },
-    {
-      key: 'vendors',
-      label: 'Vendors & Workforce',
-      value: `${activeVendorsCount} / ${onDutyStaffCount}`,
-      subtext: `${activeVendorsCount} active vendors · ${onDutyStaffCount} staff on duty`,
-      icon: Briefcase,
-      iconBg: 'rgba(16, 185, 129, 0.1)',
-      iconColor: '#10B981',
+    }] : []),
+    ...((data.rooms.filter(r => r.status === 'Maintenance' || r.housekeeping === 'Turnaround').length > 0) ? [{
+      label: `${data.rooms.filter(r => r.status === 'Maintenance' || r.housekeeping === 'Turnaround').length} Suite${data.rooms.filter(r => r.status === 'Maintenance' || r.housekeeping === 'Turnaround').length > 1 ? 's' : ''} Need Turnaround / Service`,
+      detail: 'Housekeeping or engineering check required before next arrival',
+      badge: 'Guest House',
+      badgeBg: 'var(--status-blue-bg)',
+      badgeColor: 'var(--status-blue-text)',
+      page: 'room_occupancy'
+    }] : []),
+    ...((data.vendors.filter(v => v.status === 'Under Review').length > 0) ? [{
+      label: `${data.vendors.filter(v => v.status === 'Under Review').length} Vendor Contract${data.vendors.filter(v => v.status === 'Under Review').length > 1 ? 's' : ''} Under Review`,
+      detail: 'Pending SLA evaluation or renewal sign-off',
+      badge: 'Governance',
+      badgeBg: 'var(--status-amber-bg)',
+      badgeColor: 'var(--status-amber-text)',
       page: 'vendors'
-    }
-  ] : [];
+    }] : [])
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -314,26 +306,90 @@ export const Dashboard = ({ setActivePage }) => {
         }
       </div>
 
-      {/* ─── Admin Operations Stats Grid ───────────────────────────────────── */}
-      {isAdminOrSuper && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
-          {loading
-            ? Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={`adm-${i}`} />)
-            : adminStatCards.map(card => (
-                <StatCard
-                  key={card.key}
-                  label={card.label}
-                  value={card.value}
-                  subtext={card.subtext}
-                  icon={card.icon}
-                  iconBg={card.iconBg}
-                  iconColor={card.iconColor}
-                  onClick={() => setActivePage(card.page)}
-                />
-              ))
-          }
+      {/* ─── Needs Attention & Suite/Project Visual Breakdown ──────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+        {/* Needs Attention */}
+        <div style={{
+          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.75rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Needs Attention</h4>
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Priority items requiring review</p>
+            </div>
+            <span style={{
+              fontSize: '0.75rem', fontWeight: 700, padding: '3px 10px', borderRadius: '999px',
+              backgroundColor: needsAttentionItems.length > 0 ? 'var(--status-amber-bg)' : 'var(--status-green-bg)',
+              color: needsAttentionItems.length > 0 ? 'var(--status-amber-text)' : 'var(--status-green-text)'
+            }}>
+              {needsAttentionItems.length > 0 ? `${needsAttentionItems.length} Items` : 'All Clear'}
+            </span>
+          </div>
+
+          {needsAttentionItems.length === 0 ? (
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', padding: '1rem 0' }}>
+              Everything is running smoothly — no urgent items right now.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+              {needsAttentionItems.map((item, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setActivePage(item.page)}
+                  style={{
+                    width: '100%', textAlign: 'left', padding: '0.75rem 0.9rem',
+                    borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-page)', cursor: 'pointer',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem'
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--text-main)' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.detail}</div>
+                  </div>
+                  <span style={{
+                    fontSize: '0.6875rem', fontWeight: 700, padding: '2px 8px', borderRadius: '999px',
+                    backgroundColor: item.badgeBg, color: item.badgeColor, flexShrink: 0
+                  }}>
+                    {item.badge}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+        {/* Occupancy & Project Progress Bars */}
+        <div style={{
+          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.9rem'
+        }}>
+          <div>
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Operations Health</h4>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Live capacity &amp; execution metrics</p>
+          </div>
+
+          {[
+            { label: 'Guest House Occupancy', pct: occupancyPct, meta: `${occupiedRoomsCount}/${data.rooms.length} suites`, color: '#1A3FA0' },
+            { label: 'Maintenance Resolution Rate', pct: allMaintenance.length ? Math.round((resolvedCount / allMaintenance.length) * 100) : 100, meta: `${resolvedCount}/${allMaintenance.length} resolved`, color: '#10B981' },
+            { label: 'Project Completion', pct: data.projects.length ? Math.round(((data.projects.length - activeProjectsCount) / data.projects.length) * 100) : 0, meta: `${data.projects.length - activeProjectsCount}/${data.projects.length} completed`, color: '#3B82F6' }
+          ].map(bar => (
+            <div key={bar.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{bar.label}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{bar.meta} ({bar.pct}%)</span>
+              </div>
+              <div style={{ height: '8px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                <div style={{ width: `${bar.pct}%`, height: '100%', backgroundColor: bar.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* ─── Main Content Grid (Left: Charts, Right: Recent Activity Card) ─── */}
       <div className="dashboard-main-grid">

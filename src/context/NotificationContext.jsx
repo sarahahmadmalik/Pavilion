@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase.js';
 import { useAuth } from './AuthContext.jsx';
 import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from '../lib/supabaseService.js';
-import { playNotificationChime } from '../lib/notificationSound.js';
+import { playNotificationChime, playChatChime } from '../lib/notificationSound.js';
+import { getNotificationPreferences, showBrowserNotification } from '../lib/notificationPreferences.js';
 
 const NotificationContext = createContext();
 
@@ -10,16 +11,19 @@ export const NotificationProvider = ({ children }) => {
   const { currentUser } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   useEffect(() => {
     let mounted = true;
     let subscription = null;
+    let chatSubscription = null;
 
     const loadNotifications = async () => {
       if (!currentUser) {
         if (mounted) {
           setNotifications([]);
           setUnreadCount(0);
+          setChatUnreadCount(0);
         }
         return;
       }
@@ -28,6 +32,17 @@ export const NotificationProvider = ({ children }) => {
       if (mounted && data) {
         setNotifications(data);
         setUnreadCount(data.filter(n => !n.is_read).length);
+      }
+
+      if (currentUser.role !== 'super_admin' && isSupabaseConfigured()) {
+        const { count } = await supabase
+          .from('chat_messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('recipient_id', currentUser.id)
+          .is('read_at', null);
+        if (mounted && typeof count === 'number') {
+          setChatUnreadCount(count);
+        }
       }
     };
 
@@ -47,18 +62,56 @@ export const NotificationProvider = ({ children }) => {
           },
           (payload) => {
             if (mounted) {
-              setNotifications(prev => [payload.new, ...prev]);
-              setUnreadCount(prev => prev + 1);
+              const prefs = getNotificationPreferences();
+              if (prefs.inAppNotifications) {
+                setNotifications(prev => [payload.new, ...prev]);
+                setUnreadCount(prev => prev + 1);
+              }
               playNotificationChime();
+              showBrowserNotification(payload.new?.title || 'PAVILION Notification', payload.new?.message || '');
             }
           }
         )
         .subscribe();
+
+      if (currentUser.role !== 'super_admin') {
+        chatSubscription = supabase
+          .channel(`chat_badge_${currentUser.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'chat_messages',
+              filter: `recipient_id=eq.${currentUser.id}`
+            },
+            async (payload) => {
+              if (!mounted) return;
+              const { count } = await supabase
+                .from('chat_messages')
+                .select('*', { count: 'exact', head: true })
+                .eq('recipient_id', currentUser.id)
+                .is('read_at', null);
+              if (mounted && typeof count === 'number') {
+                setChatUnreadCount(count);
+              }
+              if (payload.eventType === 'INSERT') {
+                playChatChime();
+                showBrowserNotification(
+                  'New Team Message',
+                  payload.new?.body || (payload.new?.attachment_name ? `Sent an attachment: ${payload.new.attachment_name}` : 'New message received')
+                );
+              }
+            }
+          )
+          .subscribe();
+      }
     }
 
     return () => {
       mounted = false;
       if (subscription) supabase.removeChannel(subscription);
+      if (chatSubscription) supabase.removeChannel(chatSubscription);
     };
   }, [currentUser]);
 
@@ -82,7 +135,7 @@ export const NotificationProvider = ({ children }) => {
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllRead, clearAll }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, chatUnreadCount, markAsRead, markAllRead, clearAll }}>
       {children}
     </NotificationContext.Provider>
   );

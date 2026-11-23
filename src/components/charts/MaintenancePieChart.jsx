@@ -4,6 +4,7 @@ import { Pie } from 'react-chartjs-2';
 import { useTheme } from '../../context/ThemeContext.jsx';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.defaults.font.family = "'Outfit', system-ui, -apple-system, sans-serif";
 
 export const MaintenancePieChart = ({ openCount = 0, inProgressCount = 0, resolvedCount = 0 }) => {
   const { theme } = useTheme();
@@ -33,7 +34,7 @@ export const MaintenancePieChart = ({ openCount = 0, inProgressCount = 0, resolv
         position: 'bottom',
         labels: {
           color: isDark ? '#F8FAFC' : '#0F172A',
-          font: { family: 'Inter', size: 12 },
+          font: { family: "'Outfit', system-ui, sans-serif", size: 12 },
           padding: 16
         }
       },

@@ -19,6 +19,7 @@ ChartJS.register(
   Tooltip,
   Legend
 );
+ChartJS.defaults.font.family = "'Outfit', system-ui, -apple-system, sans-serif";
 
 export const BillsBarChart = ({ billItems = [] }) => {
   const { theme } = useTheme();
@@ -57,7 +58,7 @@ export const BillsBarChart = ({ billItems = [] }) => {
     scales: {
       x: {
         grid: { display: false },
-        ticks: { color: isDark ? '#94A3B8' : '#64748B', font: { family: 'Inter', size: 11 } }
+        ticks: { color: isDark ? '#94A3B8' : '#64748B', font: { family: "'Outfit', system-ui, sans-serif", size: 11 } }
       },
       y: {
         grid: { color: isDark ? '#2E3B61' : '#E2E8F0' },

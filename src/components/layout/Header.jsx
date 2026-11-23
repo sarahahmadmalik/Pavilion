@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
+import { useNotifications } from '../../context/NotificationContext.jsx';
 import {
   Sun,
   Moon,
   Bell,
+  MessageSquare,
   User,
   LogOut,
   ChevronDown,
@@ -36,11 +38,10 @@ const ROLE_ICONS = {
 export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery, unreadCount, onOpenNotifications, onToggleMobileSidebar }) => {
   const { currentUser, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { chatUnreadCount = 0 } = useNotifications() || {};
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
-  const firstName = currentUser?.name?.split(' ')[0] || 'User';
-  const isDashboard = activePage === 'dashboard';
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
 
   return (
@@ -75,23 +76,6 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
           <Menu size={22} color="var(--text-main)" />
         </button>
 
-        {/* Welcome message on desktop dashboard */}
-        {isDashboard && (
-          <span
-            className="desktop-only-welcome"
-            style={{
-              fontSize: '1.125rem',
-              fontWeight: 800,
-              color: 'var(--text-main)',
-              whiteSpace: 'nowrap',
-              letterSpacing: '-0.02em',
-              flexShrink: 0
-            }}
-          >
-            Welcome back, {firstName}
-          </span>
-        )}
-
         {/* Global Search Bar */}
         <div style={{ flex: 1, maxWidth: '360px', minWidth: '120px' }}>
           <GlobalSearchBar
@@ -116,6 +100,56 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             ? <Moon size={18} color="var(--text-muted)" />
             : <Sun size={18} color="#F59E0B" />}
         </button>
+
+        {/* Team Chat Icon Button — visible to Admin & Staff */}
+        {currentUser?.role !== 'super_admin' && (
+          <button
+            onClick={() => setActivePage('team_chat')}
+            className="btn btn-ghost"
+            style={{ padding: '0.5rem', borderRadius: '50%', position: 'relative' }}
+            title="Team Chat"
+          >
+            <MessageSquare size={18} color={activePage === 'team_chat' ? 'var(--color-primary)' : 'var(--text-muted)'} />
+            {chatUnreadCount > 0 && (
+              <>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute',
+                    top: '2px',
+                    right: '2px',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    backgroundColor: '#EF4444',
+                    opacity: 0.55,
+                    animation: 'notifPulseRing 1.8s ease-out infinite'
+                  }}
+                />
+                <span style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  minWidth: '16px',
+                  height: '16px',
+                  background: 'linear-gradient(145deg, #F87171, #DC2626)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'white',
+                  fontSize: '0.5625rem',
+                  fontWeight: 700,
+                  padding: '0 3px',
+                  lineHeight: 1,
+                  boxShadow: '0 0 0 2px var(--bg-header), 0 1px 4px rgba(220,38,38,0.5)'
+                }}>
+                  {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                </span>
+              </>
+            )}
+          </button>
+        )}
 
         {/* Notification Bell — visible to every role */}
         <button

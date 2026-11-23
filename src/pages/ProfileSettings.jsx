@@ -1,14 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
-import { User, Lock, Sun, Moon, ShieldCheck, Mail, KeyRound, ArrowLeft, RefreshCw } from 'lucide-react';
+import { User, Lock, Sun, Moon, ShieldCheck, Mail, KeyRound, ArrowLeft, RefreshCw, Bell, Volume2 } from 'lucide-react';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
 import { ButtonSpinner } from '../components/common/Loader.jsx';
 import { supabase } from '../lib/supabase.js';
+import {
+  getNotificationPreferences,
+  saveNotificationPreferences,
+  requestBrowserNotificationPermission
+} from '../lib/notificationPreferences.js';
+import { playNotificationChime, playChatChime } from '../lib/notificationSound.js';
 
 export const ProfileSettings = ({ setToast }) => {
   const { currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const [notifPrefs, setNotifPrefs] = useState(() => getNotificationPreferences());
+
+  const handleToggleNotifPref = async (key) => {
+    if (key === 'browserNotifications' && !notifPrefs.browserNotifications) {
+      const perm = await requestBrowserNotificationPermission();
+      if (perm !== 'granted') {
+        setToast?.({ type: 'error', message: 'Browser notifications were blocked. Please allow notifications in your browser site settings.' });
+        return;
+      }
+    }
+    const updated = saveNotificationPreferences({ [key]: !notifPrefs[key] });
+    setNotifPrefs(updated);
+  };
 
   // Password & OTP Flow State
   const [step, setStep] = useState('input'); // 'input' | 'otp'
@@ -178,6 +197,69 @@ export const ProfileSettings = ({ setToast }) => {
         <button className="btn btn-secondary" onClick={toggleTheme} style={{ gap: '0.5rem' }}>
           {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />} Switch Theme Mode
         </button>
+      </div>
+
+      {/* Notification Settings Card */}
+      <div style={{
+        padding: '1.5rem',
+        borderRadius: 'var(--radius-lg)',
+        backgroundColor: 'var(--bg-card)',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1rem'
+      }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Bell size={18} color="var(--color-primary)" /> Notification Settings
+        </h3>
+
+        {[
+          { key: 'inAppNotifications', label: 'In-App Notifications', desc: 'Show live alerts in the notification bell drawer.' },
+          { key: 'browserNotifications', label: 'Browser Desktop Notifications', desc: 'Receive desktop alerts when new messages or updates arrive.' },
+          { key: 'systemBellSound', label: 'System Notification Bell Sound', desc: 'Play chime for tickets, permissions, and system alerts.', testFn: playNotificationChime },
+          { key: 'chatSound', label: 'Team Chat Sound', desc: 'Play a distinct sound when a new team chat message arrives.', testFn: playChatChime }
+        ].map(item => (
+          <div
+            key={item.key}
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              gap: '1rem',
+              padding: '0.75rem 0.9rem',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: 'var(--bg-page)',
+              border: '1px solid var(--border-color)'
+            }}
+          >
+            <div>
+              <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)' }}>{item.label}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>{item.desc}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+              {item.testFn && (
+                <button
+                  type="button"
+                  onClick={item.testFn}
+                  className="btn btn-secondary btn-sm"
+                  title="Test Sound"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Volume2 size={13} /> Test
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => handleToggleNotifPref(item.key)}
+                className={notifPrefs[item.key] ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm'}
+                style={{ minWidth: '64px' }}
+              >
+                {notifPrefs[item.key] ? 'On' : 'Off'}
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Password Change Form with 2-Step Email OTP Verification */}

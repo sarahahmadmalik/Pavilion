@@ -146,24 +146,37 @@ input, select, textarea, button {
   font-size: 0.875rem;
 }
 
-.input-control {
+.input-control,
+.form-input {
   width: 100%;
   padding: 0.625rem 0.875rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   background-color: var(--bg-input);
   color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.875rem;
   outline: none;
   transition: var(--transition-fast);
 }
 
-.input-control:focus {
+.input-control:focus,
+.form-input:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(26, 63, 160, 0.15);
 }
 
-.input-control::placeholder {
+.input-control::placeholder,
+.form-input::placeholder {
   color: var(--text-muted);
+}
+
+.form-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.375rem;
 }
 
 /* Buttons */

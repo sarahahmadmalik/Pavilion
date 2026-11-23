@@ -194,6 +194,7 @@ export const Dashboard = ({ setActivePage }) => {
   const onDutyStaffCount = data.staff.filter(s => s.status === 'On Duty' || s.status === 'In Field').length;
 
   const role = currentUser?.role || 'staff';
+  const firstName = currentUser?.name?.split(' ')[0] || 'User';
   const isAdminOrSuper = role === 'admin' || role === 'super_admin';
 
   const filteredActivityLogs = data.activityLogs.filter(log => {
@@ -377,6 +378,18 @@ export const Dashboard = ({ setActivePage }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+
+      {/* Dashboard Heading */}
+      <div className="page-header-container">
+        <div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            Welcome back, {firstName}
+          </h2>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+            Overview of community operations, guest house readiness, and recent activity.
+          </p>
+        </div>
+      </div>
 
       {/* Error Banner */}
       {error && (

@@ -16,6 +16,7 @@ import {
   deleteChatMessageForEveryone
 } from '../lib/supabaseService.js';
 import { UserAvatar } from '../components/common/UserAvatar.jsx';
+import { CustomSelect } from '../components/common/CustomSelect.jsx';
 import { ErrorBanner } from '../components/common/ErrorBanner.jsx';
 import {
   Search,
@@ -35,7 +36,8 @@ import {
   Trash2,
   Image as ImageIcon,
   Camera,
-  Ban
+  Ban,
+  Reply
 } from 'lucide-react';
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -71,8 +73,10 @@ export const TeamChat = () => {
   const [mobileView, setMobileView] = useState('list');
   const [messages, setMessages] = useState([]);
   const [search, setSearch] = useState('');
+  const [readFilter, setReadFilter] = useState('all');
   const [draft, setDraft] = useState('');
   const [attachment, setAttachment] = useState(null);
+  const [replyingTo, setReplyingTo] = useState(null);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [loadingPeers, setLoadingPeers] = useState(true);
@@ -227,7 +231,8 @@ export const TeamChat = () => {
       recipient: selectedTarget.isWorkspace ? null : selectedTarget,
       channel: selectedTarget.isWorkspace ? 'workspace' : 'dm',
       body: draft,
-      file: attachment
+      file: attachment,
+      replyToId: replyingTo?.id || null
     });
     setSending(false);
 
@@ -238,9 +243,14 @@ export const TeamChat = () => {
 
     setDraft('');
     setAttachment(null);
+    setReplyingTo(null);
     setShowAttachMenu(false);
     if (data) {
-      setMessages(prev => [...prev, { ...data, sender: { id: currentUser.id, name: currentUser.name, role: currentUser.role } }]);
+      setMessages(prev => [...prev, {
+        ...data,
+        replyTo: replyingTo || null,
+        sender: { id: currentUser.id, name: currentUser.name, role: currentUser.role, avatar: currentUser.avatar }
+      }]);
       setOverview(prev => [data, ...prev]);
     }
   };
@@ -291,11 +301,15 @@ export const TeamChat = () => {
   };
 
   const filteredPeers = peers
-    .filter(p =>
-      !search.trim() ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase())
-    )
+    .filter(p => {
+      const matchesSearch = !search.trim() ||
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.email.toLowerCase().includes(search.toLowerCase());
+      if (!matchesSearch) return false;
+      if (readFilter === 'all') return true;
+      const { unread } = getPeerMeta(p.id);
+      return readFilter === 'unread' ? unread > 0 : unread === 0;
+    })
     .sort((a, b) => {
       const aPin = pinnedConvIds.includes(a.id) ? 1 : 0;
       const bPin = pinnedConvIds.includes(b.id) ? 1 : 0;
@@ -365,7 +379,7 @@ export const TeamChat = () => {
             minHeight: 0
           }}
         >
-          <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ position: 'relative' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -376,6 +390,15 @@ export const TeamChat = () => {
                 style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: '999px', backgroundColor: 'var(--bg-page)' }}
               />
             </div>
+            <CustomSelect
+              value={readFilter}
+              onChange={setReadFilter}
+              options={[
+                { value: 'all', label: 'All Chats' },
+                { value: 'unread', label: 'Unread' },
+                { value: 'read', label: 'Read' }
+              ]}
+            />
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -569,10 +592,13 @@ export const TeamChat = () => {
                 No messages yet. Start the conversation!
               </p>
             ) : (
-              visibleMessages.map(msg => {
+              visibleMessages.map((msg, idx) => {
                 const isMine = msg.sender_id === currentUser.id;
                 const isImage = msg.attachment_type?.startsWith('image/');
                 const reactionEntries = Object.entries(msg.reactions || {}).filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
+                const openDownward = idx < 2;
+                const senderName = msg.sender?.name || (isMine ? currentUser.name : selectedTarget?.name);
+                const senderAvatar = msg.sender?.avatar || (isMine ? currentUser.avatar : selectedTarget?.avatar);
 
                 return (
                   <div
@@ -580,20 +606,24 @@ export const TeamChat = () => {
                     className="chat-msg-row"
                     style={{
                       alignSelf: isMine ? 'flex-end' : 'flex-start',
-                      maxWidth: '80%',
+                      maxWidth: '82%',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: isMine ? 'flex-end' : 'flex-start',
-                      position: 'relative'
+                      position: 'relative',
+                      zIndex: (openMenuMsgId === msg.id || openReactMsgId === msg.id) ? 40 : 1
                     }}
                   >
-                    {selectedTarget.isWorkspace && !isMine && msg.sender?.name && (
-                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px' }}>
-                        {msg.sender.name}
+                    {selectedTarget.isWorkspace && !isMine && senderName && (
+                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px', marginLeft: '34px' }}>
+                        {senderName}
                       </span>
                     )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.45rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}>
+                      {!isMine && (
+                        <UserAvatar name={senderName} src={senderAvatar} size={26} style={{ flexShrink: 0 }} />
+                      )}
                       {/* Bubble */}
                       <div style={{
                         padding: '0.6rem 0.9rem',
@@ -613,6 +643,23 @@ export const TeamChat = () => {
                           </span>
                         ) : (
                           <>
+                            {msg.replyTo && (
+                              <div style={{
+                                padding: '0.35rem 0.55rem',
+                                marginBottom: '0.4rem',
+                                borderRadius: '8px',
+                                borderLeft: `3px solid ${isMine ? '#93C5FD' : 'var(--color-primary)'}`,
+                                backgroundColor: isMine ? 'rgba(255,255,255,0.14)' : 'var(--bg-page)',
+                                fontSize: '0.74rem'
+                              }}>
+                                <div style={{ fontWeight: 700, opacity: 0.9 }}>
+                                  {msg.replyTo.sender?.name || (msg.replyTo.sender_id === currentUser.id ? 'You' : selectedTarget?.name)}
+                                </div>
+                                <div style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '210px' }}>
+                                  {msg.replyTo.deleted_for_all ? 'This message was deleted' : (msg.replyTo.body || msg.replyTo.attachment_name)}
+                                </div>
+                              </div>
+                            )}
                             {msg.is_pinned && (
                               <div style={{ fontSize: '0.65rem', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '3px', marginBottom: '3px' }}>
                                 <Pin size={10} /> Pinned
@@ -683,7 +730,10 @@ export const TeamChat = () => {
                           {/* Emoji Reaction Picker Popover */}
                           {openReactMsgId === msg.id && (
                             <div style={{
-                              position: 'absolute', bottom: '32px', [isMine ? 'right' : 'left']: 0, zIndex: 30,
+                              position: 'absolute',
+                              [openDownward ? 'top' : 'bottom']: '32px',
+                              [isMine ? 'right' : 'left']: 0,
+                              zIndex: 50,
                               backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
                               borderRadius: '999px', padding: '4px 8px', boxShadow: 'var(--shadow-dropdown)',
                               display: 'flex', gap: '4px', animation: 'popUpMenu 0.14s ease-out'
@@ -704,11 +754,22 @@ export const TeamChat = () => {
                           {/* 3-Dots Dropdown */}
                           {openMenuMsgId === msg.id && (
                             <div style={{
-                              position: 'absolute', bottom: '32px', [isMine ? 'right' : 'left']: 0, zIndex: 30,
+                              position: 'absolute',
+                              [openDownward ? 'top' : 'bottom']: '32px',
+                              [isMine ? 'right' : 'left']: 0,
+                              zIndex: 50,
                               minWidth: '175px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
                               borderRadius: '10px', padding: '4px', boxShadow: 'var(--shadow-dropdown)',
                               display: 'flex', flexDirection: 'column', animation: 'popUpMenu 0.14s ease-out'
                             }}>
+                              <button
+                                type="button"
+                                onClick={() => { setReplyingTo(msg); setOpenMenuMsgId(null); }}
+                                className="btn btn-ghost btn-sm"
+                                style={{ justifyContent: 'flex-start', gap: '8px', width: '100%' }}
+                              >
+                                <Reply size={13} /> Reply
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => handlePinMsg(msg)}
@@ -840,6 +901,27 @@ export const TeamChat = () => {
                     <Camera size={15} />
                   </span>
                   <span>Camera</span>
+                </button>
+              </div>
+            )}
+
+            {replyingTo && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem',
+                padding: '0.45rem 0.75rem', borderRadius: '10px',
+                borderLeft: '3px solid var(--color-primary)',
+                backgroundColor: 'var(--bg-page)', fontSize: '0.78rem'
+              }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: 'var(--color-primary)' }}>
+                    Replying to {replyingTo.sender?.name || (replyingTo.sender_id === currentUser.id ? 'yourself' : selectedTarget?.name)}
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {replyingTo.body || replyingTo.attachment_name}
+                  </div>
+                </div>
+                <button type="button" onClick={() => setReplyingTo(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex' }}>
+                  <X size={15} />
                 </button>
               </div>
             )}

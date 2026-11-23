@@ -1206,9 +1206,11 @@ export async function fetchWorkspaceMessages() {
 
   if (error) return { data: [], error: normalizeError(error) };
 
+  const byId = new Map((data || []).map(m => [m.id, m]));
   const hydrated = await Promise.all(
     (data || []).map(async (m) => ({
       ...m,
+      replyTo: m.reply_to_id ? byId.get(m.reply_to_id) || null : null,
       attachmentUrl: m.attachment_path ? await getChatAttachmentSignedUrl(m.attachment_path) : null
     }))
   );
@@ -1218,7 +1220,8 @@ export async function fetchWorkspaceMessages() {
 export async function fetchChatMessages(currentUserId, peerId) {
   const { data, error } = await supabase
     .from('chat_messages')
-    .select('*')
+    .select('*, sender:users!chat_messages_sender_id_fkey(id, name, role, avatar)')
+    .eq('channel', 'dm')
     .or(
       `and(sender_id.eq.${currentUserId},recipient_id.eq.${peerId}),and(sender_id.eq.${peerId},recipient_id.eq.${currentUserId})`
     )
@@ -1226,9 +1229,11 @@ export async function fetchChatMessages(currentUserId, peerId) {
 
   if (error) return { data: [], error: normalizeError(error) };
 
+  const byId = new Map((data || []).map(m => [m.id, m]));
   const hydrated = await Promise.all(
     (data || []).map(async (m) => ({
       ...m,
+      replyTo: m.reply_to_id ? byId.get(m.reply_to_id) || null : null,
       attachmentUrl: m.attachment_path ? await getChatAttachmentSignedUrl(m.attachment_path) : null
     }))
   );
@@ -1258,7 +1263,7 @@ export async function markChatMessagesRead(currentUserId, senderId) {
   return { error: normalizeError(error) };
 }
 
-export async function sendChatMessage({ sender, recipient, channel = 'dm', body, file }) {
+export async function sendChatMessage({ sender, recipient, channel = 'dm', body, file, replyToId = null }) {
   if (!sender || sender.role === 'super_admin') {
     return { data: null, error: { message: 'Team chat is available only for Admin and Staff accounts.' } };
   }
@@ -1304,6 +1309,7 @@ export async function sendChatMessage({ sender, recipient, channel = 'dm', body,
       channel,
       sender_id: sender.id,
       recipient_id: channel === 'workspace' ? null : recipient.id,
+      reply_to_id: replyToId || null,
       body: cleanBody || null,
       ...attachmentMeta
     })

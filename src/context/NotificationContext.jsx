@@ -17,6 +17,7 @@ export const NotificationProvider = ({ children }) => {
     let mounted = true;
     let subscription = null;
     let chatSubscription = null;
+    let pollInterval = null;
 
     const loadNotifications = async () => {
       if (!currentUser) {
@@ -75,6 +76,17 @@ export const NotificationProvider = ({ children }) => {
         .subscribe();
 
       if (currentUser.role !== 'super_admin') {
+        const syncChatCount = async () => {
+          const { count } = await supabase
+            .from('chat_messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('recipient_id', currentUser.id)
+            .is('read_at', null);
+          if (mounted && typeof count === 'number') {
+            setChatUnreadCount(count);
+          }
+        };
+
         chatSubscription = supabase
           .channel(`chat_badge_${currentUser.id}`)
           .on(
@@ -82,34 +94,34 @@ export const NotificationProvider = ({ children }) => {
             {
               event: '*',
               schema: 'public',
-              table: 'chat_messages',
-              filter: `recipient_id=eq.${currentUser.id}`
+              table: 'chat_messages'
             },
             async (payload) => {
               if (!mounted) return;
-              const { count } = await supabase
-                .from('chat_messages')
-                .select('*', { count: 'exact', head: true })
-                .eq('recipient_id', currentUser.id)
-                .is('read_at', null);
-              if (mounted && typeof count === 'number') {
-                setChatUnreadCount(count);
-              }
+              const row = payload.new || payload.old;
+              if (!row) return;
+              const isForMe = row.recipient_id === currentUser.id || (row.channel === 'workspace' && row.sender_id !== currentUser.id);
+              if (!isForMe) return;
+
+              await syncChatCount();
               if (payload.eventType === 'INSERT') {
                 playChatChime();
                 showBrowserNotification(
-                  'New Team Message',
-                  payload.new?.body || (payload.new?.attachment_name ? `Sent an attachment: ${payload.new.attachment_name}` : 'New message received')
+                  row.channel === 'workspace' ? 'New Workspace Message' : 'New Team Message',
+                  row.body || (row.attachment_name ? `Sent an attachment: ${row.attachment_name}` : 'New message received')
                 );
               }
             }
           )
           .subscribe();
+
+        pollInterval = setInterval(syncChatCount, 15000);
       }
     }
 
     return () => {
       mounted = false;
+      if (pollInterval) clearInterval(pollInterval);
       if (subscription) supabase.removeChannel(subscription);
       if (chatSubscription) supabase.removeChannel(chatSubscription);
     };

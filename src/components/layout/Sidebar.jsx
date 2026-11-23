@@ -430,7 +430,7 @@ export const Sidebar = ({
         confirmLoadingText="Signing out..."
         icon={LogOut}
         confirmIcon={LogOut}
-        danger={false}
+        danger={true}
       />
     </>
   );

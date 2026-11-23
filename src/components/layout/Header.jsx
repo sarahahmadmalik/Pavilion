@@ -399,7 +399,7 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
         confirmLoadingText="Signing out..."
         icon={LogOut}
         confirmIcon={LogOut}
-        danger={false}
+        danger={true}
       />
     </header>
   );

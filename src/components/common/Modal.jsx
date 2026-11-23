@@ -23,7 +23,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = '550px' }) 
     <div style={{
       position: 'fixed',
       inset: 0,
-      zIndex: 1000,
+      zIndex: 9999,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',

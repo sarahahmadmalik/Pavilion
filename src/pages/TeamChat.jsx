@@ -359,6 +359,19 @@ export const TeamChat = () => {
     p.role.toLowerCase().includes(peopleSearch.toLowerCase())
   );
 
+  const handleOpenDmFromSender = (msg) => {
+    if (!msg?.sender_id || msg.sender_id === currentUser.id) return;
+    const matchedPeer = peers.find(p => p.id === msg.sender_id) || {
+      id: msg.sender_id,
+      name: msg.sender?.name || 'Team Member',
+      role: msg.sender?.role || 'staff',
+      avatar: msg.sender?.avatar || null,
+      email: ''
+    };
+    if (matchedPeer.role === 'super_admin') return;
+    handleSelectTarget(matchedPeer);
+  };
+
   const visibleMessages = messages.filter(m => !(m.deleted_for || []).includes(currentUser.id));
   const pinnedMessages = visibleMessages.filter(m => m.is_pinned && !m.deleted_for_all);
   const latestPinned = pinnedMessages[pinnedMessages.length - 1] || null;
@@ -773,9 +786,18 @@ export const TeamChat = () => {
                     }}
                   >
                     {selectedTarget.isWorkspace && !isMine && senderName && (
-                      <span style={{ fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)', marginBottom: '2px', marginLeft: '34px' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDmFromSender(msg)}
+                        title={`Message ${senderName}`}
+                        style={{
+                          background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                          fontSize: '0.6875rem', fontWeight: 700, color: 'var(--color-primary)',
+                          marginBottom: '2px', marginLeft: '34px', textAlign: 'left'
+                        }}
+                      >
                         {senderName}
-                      </span>
+                      </button>
                     )}
 
                     <div
@@ -785,7 +807,27 @@ export const TeamChat = () => {
                       style={{ display: 'flex', alignItems: 'flex-end', gap: '0.45rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}
                     >
                       {!isMine && (
-                        <UserAvatar name={senderName} src={senderAvatar} size={26} style={{ flexShrink: 0 }} />
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDmFromSender(msg)}
+                          title={`Open DM with ${senderName}`}
+                          style={{
+                            position: 'relative', flexShrink: 0, background: 'none',
+                            border: 'none', padding: 0, cursor: 'pointer'
+                          }}
+                        >
+                          <UserAvatar name={senderName} src={senderAvatar} size={26} />
+                          {onlineUserIds.includes(msg.sender_id) && (
+                            <span
+                              title="Online"
+                              style={{
+                                position: 'absolute', bottom: '-1px', right: '-1px',
+                                width: '9px', height: '9px', borderRadius: '50%',
+                                backgroundColor: '#22C55E', border: '1.5px solid var(--bg-page)'
+                              }}
+                            />
+                          )}
+                        </button>
                       )}
                       {/* Bubble */}
                       <div style={{

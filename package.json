@@ -1,7 +1,7 @@
 {
-  "name": "mta-ghana",
+  "name": "pavilion-management",
   "version": "1.0.0",
-  "description": "",
+  "description": "PAVILION — Community & Guest House Management Platform",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "seed": "node scripts/seedAllData.js"
   },
-  "keywords": [],
+  "keywords": ["community-management", "guest-house", "operations", "supabase", "react"],
   "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "2.112.0",

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
@@ -27,16 +27,32 @@ import { PageLoader } from './components/common/Loader.jsx';
 import { ProtectedRoute } from './components/common/ProtectedRoute.jsx';
 import { ErrorBoundary } from './components/common/ErrorBoundary.jsx';
 import { NotFound } from './pages/NotFound.jsx';
+import { getPageFromPath, getPathForPage } from './lib/routes.js';
 
 const MainContent = () => {
   const { currentUser, authLoading } = useAuth();
-  const [activePage, setActivePage] = useState('dashboard');
-  const isUnknownPath = window.location.pathname !== '/' && window.location.pathname !== '/index.html';
+  const [activePage, setActivePageState] = useState(() => getPageFromPath(window.location.pathname));
 
-  if (isUnknownPath) {
+  const setActivePage = useCallback((pageKey) => {
+    setActivePageState(pageKey);
+    const targetPath = getPathForPage(pageKey);
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState(null, '', targetPath);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setActivePageState(getPageFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  if (activePage === 'not_found') {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-page)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <NotFound onGoHome={() => { window.history.replaceState(null, '', '/'); window.location.reload(); }} />
+        <NotFound onGoHome={() => setActivePage('dashboard')} />
       </div>
     );
   }

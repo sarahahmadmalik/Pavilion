@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { BrandLogo } from '../common/BrandLogo.jsx';
 import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
+import { getPathForPage } from '../../lib/routes.js';
 import {
   LayoutDashboard,
   Users,
@@ -103,9 +104,14 @@ export const Sidebar = ({
     const isActive = activePage === item.key;
 
     return (
-      <button
+      <a
         key={item.key}
-        onClick={() => handleNavClick(item.key)}
+        href={getPathForPage(item.key)}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          handleNavClick(item.key);
+        }}
         style={{
           width: '100%',
           display: 'flex',
@@ -118,6 +124,7 @@ export const Sidebar = ({
           fontWeight: isActive ? 600 : 400,
           fontSize: '0.84rem',
           border: 'none',
+          textDecoration: 'none',
           cursor: 'pointer',
           justifyContent: isCollapsed ? 'center' : 'flex-start',
           transition: 'background-color 0.14s ease, color 0.14s ease',
@@ -174,7 +181,7 @@ export const Sidebar = ({
             {item.label}
           </span>
         )}
-      </button>
+      </a>
     );
   };
 

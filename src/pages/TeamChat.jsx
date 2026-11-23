@@ -84,7 +84,7 @@ export const TeamChat = () => {
   const [loadingPeers, setLoadingPeers] = useState(true);
 
   const [showAttachMenu, setShowAttachMenu] = useState(false);
-  const [showPeopleModal, setShowPeopleModal] = useState(false);
+  const [showPeoplePanel, setShowPeoplePanel] = useState(false);
   const [peopleSearch, setPeopleSearch] = useState('');
   const [openMenuMsgId, setOpenMenuMsgId] = useState(null);
   const [openReactMsgId, setOpenReactMsgId] = useState(null);
@@ -411,7 +411,7 @@ export const TeamChat = () => {
       )}
 
       <div className="team-chat-shell">
-        {/* Left: Channels & Peers */}
+        {/* Left: Chats List OR WhatsApp-style People in Workspace Panel */}
         <div
           className={mobileView === 'thread' ? 'team-chat-hidden-mobile' : ''}
           style={{
@@ -422,6 +422,98 @@ export const TeamChat = () => {
             minHeight: 0
           }}
         >
+          {showPeoplePanel ? (
+            <>
+              <div style={{
+                padding: '0.75rem 0.85rem',
+                borderBottom: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.55rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowPeoplePanel(false); setPeopleSearch(''); }}
+                    className="btn btn-ghost"
+                    style={{ padding: '0.3rem', borderRadius: '50%' }}
+                    title="Back to Chats"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    New Chat
+                  </span>
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    className="form-input"
+                    value={peopleSearch}
+                    onChange={e => setPeopleSearch(e.target.value)}
+                    placeholder="Search Admin & Staff..."
+                    style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-page)' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto' }}>
+                <div style={{ padding: '0.55rem 1rem 0.25rem', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  People in Workspace ({modalPeople.length})
+                </div>
+                {modalPeople.length === 0 ? (
+                  <p style={{ textAlign: 'center', padding: '1.5rem 1rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                    No matching workspace members found.
+                  </p>
+                ) : (
+                  modalPeople.map(person => {
+                    const online = onlineUserIds.includes(person.id);
+                    return (
+                      <button
+                        key={person.id}
+                        type="button"
+                        onClick={() => {
+                          handleSelectTarget(person);
+                          setShowPeoplePanel(false);
+                          setPeopleSearch('');
+                        }}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.75rem',
+                          padding: '0.75rem 1rem',
+                          border: 'none',
+                          borderBottom: '1px solid var(--border-color)',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          textAlign: 'left'
+                        }}
+                      >
+                        <div style={{ position: 'relative', flexShrink: 0 }}>
+                          <UserAvatar name={person.name} src={person.avatar} size={38} />
+                          <span style={{
+                            position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px',
+                            borderRadius: '50%', backgroundColor: online ? '#22C55E' : '#94A3B8',
+                            border: '2px solid var(--bg-card)'
+                          }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {person.name}
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: online ? '#16A34A' : 'var(--text-muted)', textTransform: 'capitalize' }}>
+                            {person.role} · {online ? 'Online' : formatLastSeen(person.last_seen)}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          ) : (
+            <>
           <div style={{ padding: '0.75rem 0.85rem', borderBottom: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
@@ -436,7 +528,7 @@ export const TeamChat = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setShowPeopleModal(true)}
+                onClick={() => setShowPeoplePanel(true)}
                 className="btn btn-primary"
                 title="People in Workspace / New Chat"
                 style={{ padding: '0.5rem', borderRadius: '50%', width: '36px', height: '36px', flexShrink: 0 }}
@@ -495,7 +587,7 @@ export const TeamChat = () => {
                 <p style={{ marginBottom: '0.6rem' }}>No chat history yet.</p>
                 <button
                   type="button"
-                  onClick={() => setShowPeopleModal(true)}
+                  onClick={() => setShowPeoplePanel(true)}
                   className="btn btn-secondary btn-sm"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}
                 >
@@ -571,6 +663,8 @@ export const TeamChat = () => {
               })
             )}
           </div>
+            </>
+          )}
         </div>
 
         {/* Right: Active Thread (iPhone-style clean layout on mobile) */}
@@ -1037,71 +1131,6 @@ export const TeamChat = () => {
         </div>
       </div>
 
-      {/* People in Workspace Modal */}
-      <Modal
-        isOpen={showPeopleModal}
-        onClose={() => { setShowPeopleModal(false); setPeopleSearch(''); }}
-        title="People in Workspace"
-        maxWidth="440px"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              className="form-input"
-              value={peopleSearch}
-              onChange={e => setPeopleSearch(e.target.value)}
-              placeholder="Search Admin & Staff members..."
-              style={{ paddingLeft: '2.2rem' }}
-            />
-          </div>
-
-          <div style={{ maxHeight: '340px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-            {modalPeople.length === 0 ? (
-              <p style={{ textAlign: 'center', padding: '1.5rem', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-                No matching workspace members found.
-              </p>
-            ) : (
-              modalPeople.map(person => {
-                const online = onlineUserIds.includes(person.id);
-                return (
-                  <button
-                    key={person.id}
-                    type="button"
-                    onClick={() => {
-                      handleSelectTarget(person);
-                      setShowPeopleModal(false);
-                      setPeopleSearch('');
-                    }}
-                    style={{
-                      width: '100%', display: 'flex', alignItems: 'center', gap: '0.75rem',
-                      padding: '0.65rem 0.75rem', borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-page)',
-                      cursor: 'pointer', textAlign: 'left'
-                    }}
-                  >
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <UserAvatar name={person.name} src={person.avatar} size={38} />
-                      <span style={{
-                        position: 'absolute', bottom: 0, right: 0, width: '10px', height: '10px',
-                        borderRadius: '50%', backgroundColor: online ? '#22C55E' : '#94A3B8',
-                        border: '2px solid var(--bg-page)'
-                      }} />
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)' }}>{person.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                        {person.role} · {online ? 'Online' : formatLastSeen(person.last_seen)}
-                      </div>
-                    </div>
-                    <span className="btn btn-primary btn-sm" style={{ flexShrink: 0 }}>Message</span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </Modal>
       {/* Delete Message Confirmation Modal */}
       <Modal
         isOpen={!!deleteModalMsg}

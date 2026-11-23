@@ -45,6 +45,9 @@ export const Sidebar = ({
   const [logoHovered, setLogoHovered] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
+  // Never render the mobile drawer in collapsed icon-only mode
+  const collapsed = isCollapsed && !isMobileOpen;
+
   const ticketUnreadCount = (notifications || []).filter(n => n.ticket_id && !n.is_read).length;
 
   const navCategories = [
@@ -117,7 +120,7 @@ export const Sidebar = ({
           display: 'flex',
           alignItems: 'center',
           gap: '0.8125rem',
-          padding: isCollapsed ? '0.55rem 0' : '0.45rem 0.75rem',
+          padding: collapsed ? '0.55rem 0' : '0.45rem 0.75rem',
           borderRadius: '8px',
           backgroundColor: isActive ? ACTIVE_BG : 'transparent',
           color: isActive ? ACTIVE_COLOR : INACTIVE_COLOR,
@@ -126,7 +129,7 @@ export const Sidebar = ({
           border: 'none',
           textDecoration: 'none',
           cursor: 'pointer',
-          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          justifyContent: collapsed ? 'center' : 'flex-start',
           transition: 'background-color 0.14s ease, color 0.14s ease',
           whiteSpace: 'nowrap',
           letterSpacing: '0.01em',
@@ -145,7 +148,7 @@ export const Sidebar = ({
             e.currentTarget.style.color = INACTIVE_COLOR;
           }
         }}
-        title={isCollapsed ? item.label : undefined}
+        title={collapsed ? item.label : undefined}
       >
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <Icon
@@ -156,8 +159,8 @@ export const Sidebar = ({
           {!!item.badge && (
             <span style={{
               position: 'absolute',
-              top: isCollapsed ? '-4px' : '-5px',
-              right: isCollapsed ? '-6px' : '-7px',
+              top: collapsed ? '-4px' : '-5px',
+              right: collapsed ? '-6px' : '-7px',
               minWidth: '15px',
               height: '15px',
               padding: '0 3px',
@@ -176,7 +179,7 @@ export const Sidebar = ({
             </span>
           )}
         </div>
-        {!isCollapsed && (
+        {!collapsed && (
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
             {item.label}
           </span>
@@ -213,7 +216,7 @@ export const Sidebar = ({
       <aside
         className={`sidebar-container ${isMobileOpen ? 'mobile-open' : ''}`}
         style={{
-          width: isCollapsed ? '72px' : '248px',
+          width: collapsed ? '72px' : '248px',
           backgroundColor: 'var(--bg-sidebar)',
           display: 'flex',
           flexDirection: 'column',
@@ -234,8 +237,8 @@ export const Sidebar = ({
           height: '68px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isCollapsed ? 'center' : 'flex-start',
-          padding: isCollapsed ? '0 0.5rem' : '0 0.75rem',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          padding: collapsed ? '0 0.5rem' : '0 0.75rem',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
           flexShrink: 0,
           gap: '0.625rem',
@@ -245,18 +248,18 @@ export const Sidebar = ({
           <div
             onMouseEnter={() => setLogoHovered(true)}
             onMouseLeave={() => setLogoHovered(false)}
-            onClick={() => { if (isCollapsed) setIsCollapsed(false); }}
+            onClick={() => { if (collapsed) setIsCollapsed(false); }}
             style={{
               position: 'relative',
-              cursor: isCollapsed ? 'pointer' : 'default',
+              cursor: collapsed ? 'pointer' : 'default',
               flexShrink: 0
             }}
-            title={isCollapsed ? 'Expand Sidebar' : undefined}
+            title={collapsed ? 'Expand Sidebar' : undefined}
           >
-            <BrandLogo size={isCollapsed ? 28 : 30} showText={!isCollapsed} lightText={true} subtitle="Community & Guest House" />
+            <BrandLogo size={collapsed ? 28 : 30} showText={!collapsed} lightText={true} subtitle="Community & Guest House" />
 
             {/* Hover overlay on logo ONLY when collapsed */}
-            {isCollapsed && (
+            {collapsed && (
               <div
                 style={{
                   position: 'absolute',
@@ -313,11 +316,11 @@ export const Sidebar = ({
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.45rem',
-                    margin: isCollapsed ? '0.45rem 0 0.15rem' : '0.55rem 0.25rem 0.15rem',
+                    margin: collapsed ? '0.45rem 0 0.15rem' : '0.55rem 0.25rem 0.15rem',
                     flexShrink: 0
                   }}>
-                    <div style={{ flex: isCollapsed ? '1' : '0 0 10px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
-                    {!isCollapsed && (
+                    <div style={{ flex: collapsed ? '1' : '0 0 10px', height: '1px', backgroundColor: 'rgba(255,255,255,0.08)' }} />
+                    {!collapsed && (
                       <span style={{
                         fontSize: '0.625rem',
                         fontWeight: 700,
@@ -345,26 +348,26 @@ export const Sidebar = ({
           flexShrink: 0,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: isCollapsed ? 'center' : 'space-between',
-          flexDirection: isCollapsed ? 'column' : 'row',
+          justifyContent: collapsed ? 'center' : 'space-between',
+          flexDirection: collapsed ? 'column' : 'row',
           gap: '0.375rem'
         }}>
           <button
             onClick={handleSignOut}
             style={{
-              flex: isCollapsed ? 'none' : 1,
-              width: isCollapsed ? '100%' : 'auto',
+              flex: collapsed ? 'none' : 1,
+              width: collapsed ? '100%' : 'auto',
               display: 'flex',
               alignItems: 'center',
               gap: '0.8125rem',
-              padding: isCollapsed ? '0.625rem 0' : '0.625rem 0.875rem',
+              padding: collapsed ? '0.625rem 0' : '0.625rem 0.875rem',
               borderRadius: '9px',
               backgroundColor: 'transparent',
               color: '#5D6A85',
               fontSize: '0.875rem',
               border: 'none',
               cursor: 'pointer',
-              justifyContent: isCollapsed ? 'center' : 'flex-start',
+              justifyContent: collapsed ? 'center' : 'flex-start',
               transition: 'background-color 0.14s ease, color 0.14s ease',
               fontFamily: 'inherit',
               fontWeight: 400
@@ -377,10 +380,10 @@ export const Sidebar = ({
               e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.color = '#5D6A85';
             }}
-            title={isCollapsed ? 'Sign Out' : undefined}
+            title={collapsed ? 'Sign Out' : undefined}
           >
             <LogOut size={20} strokeWidth={1.6} style={{ flexShrink: 0, color: 'inherit' }} />
-            {!isCollapsed && <span style={{ whiteSpace: 'nowrap' }}>Sign Out</span>}
+            {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>Sign Out</span>}
           </button>
 
           {!isMobileOpen && (

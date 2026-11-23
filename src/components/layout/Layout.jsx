@@ -108,16 +108,18 @@ const NotificationCard = ({ notif, onRead, onNavigate }) => {
 // ─── Main Layout ──────────────────────────────────────────────────────────────
 export const Layout = ({ activePage, setActivePage, children }) => {
   const [isCollapsed, setIsCollapsed] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth <= 1180 : false
+    typeof window !== 'undefined' ? window.innerWidth <= 1180 && window.innerWidth > 768 : false
   );
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Auto-collapse sidebar on mid-size screens (tablets / small laptops)
+  // Auto-collapse sidebar ONLY on mid-size screens (769px–1180px), never on mobile (<= 768px where the hamburger drawer is used)
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth <= 1180 && window.innerWidth > 768) {
+      if (window.innerWidth <= 768) {
+        setIsCollapsed(false);
+      } else if (window.innerWidth <= 1180) {
         setIsCollapsed(true);
-      } else if (window.innerWidth > 1180) {
+      } else {
         setIsCollapsed(false);
       }
     };

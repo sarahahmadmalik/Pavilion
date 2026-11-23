@@ -90,6 +90,13 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
 
       {/* ─── Right: Theme Toggle + Notifications + Profile ────────────────────────── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', flexShrink: 0 }}>
+        <style>{`
+          @keyframes notifPulseRing {
+            0% { transform: scale(1); opacity: 0.55; }
+            70% { transform: scale(2.1); opacity: 0; }
+            100% { transform: scale(2.1); opacity: 0; }
+          }
+        `}</style>
 
         {/* Theme Toggle Button — visible on desktop / tablet (>768px) */}
         <button

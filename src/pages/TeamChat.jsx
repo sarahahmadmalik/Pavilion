@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useNotifications } from '../context/NotificationContext.jsx';
 import { supabase } from '../lib/supabase.js';
 import {
   fetchChatPeers,
@@ -43,6 +44,7 @@ const WORKSPACE_TARGET = { id: 'workspace', name: 'Community Workspace', isWorks
 
 export const TeamChat = () => {
   const { currentUser } = useAuth();
+  const { refreshChatUnreadCount } = useNotifications() || {};
   const [peers, setPeers] = useState([]);
   const [overview, setOverview] = useState([]);
   const [selectedTarget, setSelectedTarget] = useState(WORKSPACE_TARGET);
@@ -129,6 +131,7 @@ export const TeamChat = () => {
     }
     setMessages(data || []);
     await markChatMessagesRead(currentUser.id, target.id);
+    refreshChatUnreadCount?.();
     setOverview(prev => prev.map(m =>
       m.sender_id === target.id && m.recipient_id === currentUser.id && !m.read_at
         ? { ...m, read_at: new Date().toISOString(), delivered_at: m.delivered_at || new Date().toISOString() }

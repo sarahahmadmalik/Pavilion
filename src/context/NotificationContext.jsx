@@ -134,8 +134,20 @@ export const NotificationProvider = ({ children }) => {
     await clearAllNotifications(currentUser.id);
   };
 
+  const refreshChatUnreadCount = async () => {
+    if (!currentUser || currentUser.role === 'super_admin' || !isSupabaseConfigured()) return;
+    const { count } = await supabase
+      .from('chat_messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('recipient_id', currentUser.id)
+      .is('read_at', null);
+    if (typeof count === 'number') {
+      setChatUnreadCount(count);
+    }
+  };
+
   return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, chatUnreadCount, markAsRead, markAllRead, clearAll }}>
+    <NotificationContext.Provider value={{ notifications, unreadCount, chatUnreadCount, refreshChatUnreadCount, markAsRead, markAllRead, clearAll }}>
       {children}
     </NotificationContext.Provider>
   );

@@ -88,6 +88,9 @@ export const TeamChat = () => {
   const [peopleSearch, setPeopleSearch] = useState('');
   const [openMenuMsgId, setOpenMenuMsgId] = useState(null);
   const [openReactMsgId, setOpenReactMsgId] = useState(null);
+  const [deleteModalMsg, setDeleteModalMsg] = useState(null);
+  const [deletingMsg, setDeletingMsg] = useState(false);
+  const longPressTimerRef = useRef(null);
   const [pinnedConvIds, setPinnedConvIds] = useState(() => {
     try {
       const saved = localStorage.getItem(`pavilion_pinned_chats_${currentUser?.id || 'anon'}`);
@@ -277,18 +280,44 @@ export const TeamChat = () => {
   };
 
   const handleDeleteForMe = async (msg) => {
-    setOpenMenuMsgId(null);
+    setDeletingMsg(true);
     const { error: delErr } = await deleteChatMessageForMe(msg.id, currentUser.id, msg.deleted_for);
-    if (!delErr) {
-      setMessages(prev => prev.filter(m => m.id !== msg.id));
+    setDeletingMsg(false);
+    if (delErr) {
+      setError(delErr.message);
+      return;
     }
+    setDeleteModalMsg(null);
+    setMessages(prev => prev.filter(m => m.id !== msg.id));
   };
 
   const handleDeleteForEveryone = async (msg) => {
-    setOpenMenuMsgId(null);
-    const { data } = await deleteChatMessageForEveryone(msg.id);
+    setDeletingMsg(true);
+    const { data, error: delErr } = await deleteChatMessageForEveryone(msg.id);
+    setDeletingMsg(false);
+    if (delErr) {
+      setError(delErr.message);
+      return;
+    }
+    setDeleteModalMsg(null);
     if (data) {
       setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, ...data, attachmentUrl: null } : m));
+    }
+  };
+
+  const startLongPress = (msg) => {
+    if (msg.deleted_for_all) return;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      setOpenReactMsgId(msg.id);
+      setOpenMenuMsgId(msg.id);
+    }, 450);
+  };
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
   };
 
@@ -402,7 +431,7 @@ export const TeamChat = () => {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Search chats..."
-                  style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: '999px', backgroundColor: 'var(--bg-page)' }}
+                  style={{ paddingLeft: '2.2rem', fontSize: '0.8125rem', borderRadius: 'var(--radius-md)', backgroundColor: 'var(--bg-page)' }}
                 />
               </div>
               <button
@@ -655,7 +684,12 @@ export const TeamChat = () => {
                       </span>
                     )}
 
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '0.45rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}>
+                    <div
+                      onTouchStart={() => startLongPress(msg)}
+                      onTouchEnd={cancelLongPress}
+                      onTouchMove={cancelLongPress}
+                      style={{ display: 'flex', alignItems: 'flex-end', gap: '0.45rem', flexDirection: isMine ? 'row-reverse' : 'row', position: 'relative' }}
+                    >
                       {!isMine && (
                         <UserAvatar name={senderName} src={senderAvatar} size={26} style={{ flexShrink: 0 }} />
                       )}
@@ -815,22 +849,12 @@ export const TeamChat = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleDeleteForMe(msg)}
+                                onClick={() => { setDeleteModalMsg(msg); setOpenMenuMsgId(null); setOpenReactMsgId(null); }}
                                 className="btn btn-ghost btn-sm"
-                                style={{ justifyContent: 'flex-start', gap: '8px', width: '100%' }}
+                                style={{ justifyContent: 'flex-start', gap: '8px', width: '100%', color: '#DC2626' }}
                               >
-                                <Trash2 size={13} /> Delete for Me
+                                <Trash2 size={13} /> Delete Message
                               </button>
-                              {isMine && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteForEveryone(msg)}
-                                  className="btn btn-ghost btn-sm"
-                                  style={{ justifyContent: 'flex-start', gap: '8px', width: '100%', color: '#DC2626' }}
-                                >
-                                  <Trash2 size={13} /> Delete for Everyone
-                                </button>
-                              )}
                             </div>
                           )}
                         </div>
@@ -996,7 +1020,7 @@ export const TeamChat = () => {
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 placeholder={selectedTarget.isWorkspace ? 'Message #community-ops...' : `Message ${selectedTarget.name}...`}
-                style={{ flex: 1, minWidth: 0, borderRadius: '999px', paddingLeft: '1rem', paddingRight: '1rem' }}
+                style={{ flex: 1, minWidth: 0, borderRadius: 'var(--radius-md)' }}
               />
 
               <button
@@ -1077,6 +1101,52 @@ export const TeamChat = () => {
             )}
           </div>
         </div>
+      </Modal>
+      {/* Delete Message Confirmation Modal */}
+      <Modal
+        isOpen={!!deleteModalMsg}
+        onClose={deletingMsg ? () => {} : () => setDeleteModalMsg(null)}
+        title="Delete Message?"
+        maxWidth="400px"
+      >
+        {deleteModalMsg && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              Choose how you would like to remove this message. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {deleteModalMsg.sender_id === currentUser.id && !deleteModalMsg.deleted_for_all && (
+                <button
+                  type="button"
+                  disabled={deletingMsg}
+                  onClick={() => handleDeleteForEveryone(deleteModalMsg)}
+                  className="btn btn-danger"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                >
+                  {deletingMsg ? 'Deleting...' : 'Delete for Everyone'}
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={deletingMsg}
+                onClick={() => handleDeleteForMe(deleteModalMsg)}
+                className="btn btn-secondary"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Delete for Me
+              </button>
+              <button
+                type="button"
+                disabled={deletingMsg}
+                onClick={() => setDeleteModalMsg(null)}
+                className="btn btn-ghost"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

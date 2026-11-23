@@ -17,8 +17,13 @@ CREATE TABLE IF NOT EXISTS public.chat_messages (
   read_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT chat_has_content CHECK (
-    (body IS NOT NULL AND length(trim(body)) > 0) OR attachment_path IS NOT NULL
+    deleted_for_all OR (body IS NOT NULL AND length(trim(body)) > 0) OR attachment_path IS NOT NULL
   )
+);
+
+ALTER TABLE public.chat_messages DROP CONSTRAINT IF EXISTS chat_has_content;
+ALTER TABLE public.chat_messages ADD CONSTRAINT chat_has_content CHECK (
+  deleted_for_all OR (body IS NOT NULL AND length(trim(body)) > 0) OR attachment_path IS NOT NULL
 );
 
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS channel TEXT NOT NULL DEFAULT 'dm';

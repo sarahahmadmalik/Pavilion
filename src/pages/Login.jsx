@@ -5,7 +5,8 @@ import { Modal } from '../components/common/Modal.jsx';
 import { Spinner } from '../components/common/Loader.jsx';
 import { BrandLogo } from '../components/common/BrandLogo.jsx';
 import { isSupabaseConfigured } from '../lib/supabase.js';
-import { Eye, EyeOff, Lock, Mail, ShieldAlert, Sun, Moon } from 'lucide-react';
+import { DEMO_ACCOUNTS } from '../lib/demoAccounts.js';
+import { Eye, EyeOff, Lock, Mail, ShieldAlert, Sun, Moon, Users } from 'lucide-react';
 
 export const Login = ({ onLoginSuccess }) => {
   const { login } = useAuth();
@@ -19,6 +20,7 @@ export const Login = ({ onLoginSuccess }) => {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
+  const [showDemoMenu, setShowDemoMenu] = useState(false);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutUntil, setLockoutUntil] = useState(0);
 
@@ -52,11 +54,13 @@ export const Login = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleQuickLogin = async (presetEmail) => {
-    setEmail(presetEmail);
-    setPassword('password123');
+  const handleDemoAccountLogin = async (account) => {
+    setShowDemoMenu(false);
+    setErrorMessage('');
+    setEmail(account.email);
+    setPassword(account.password);
     setIsSubmitting(true);
-    const res = await login(presetEmail, 'password123');
+    const res = await login(account.email, account.password);
     setIsSubmitting(false);
     if (res.success) onLoginSuccess();
     else setErrorMessage(res.message);
@@ -73,8 +77,71 @@ export const Login = ({ onLoginSuccess }) => {
       padding: '1.5rem',
       position: 'relative'
     }}>
-      {/* Top Theme Toggle */}
-      <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem' }}>
+      {/* Top Demo Quick-Login + Theme Toggle */}
+      <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setShowDemoMenu(!showDemoMenu)}
+            className="btn btn-secondary btn-sm"
+            style={{ borderRadius: 'var(--radius-full)', padding: '0.5rem 0.85rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            title="Demo Accounts"
+          >
+            <Users size={15} color="var(--color-primary)" />
+            <span>Demo</span>
+          </button>
+
+          {showDemoMenu && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              right: 0,
+              width: '250px',
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: 'var(--shadow-dropdown)',
+              padding: '0.4rem',
+              zIndex: 50,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '2px',
+              animation: 'popUpMenu 0.15s ease-out'
+            }}>
+              <div style={{ padding: '0.35rem 0.6rem', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+                Select Demo User
+              </div>
+              {DEMO_ACCOUNTS.map(acc => (
+                <button
+                  key={acc.email}
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleDemoAccountLogin(acc)}
+                  className="btn btn-ghost btn-sm"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'space-between',
+                    padding: '0.5rem 0.6rem',
+                    fontSize: '0.8125rem'
+                  }}
+                >
+                  <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{acc.name}</span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    backgroundColor: acc.role === 'super_admin' ? 'var(--color-primary-light)' : acc.role === 'admin' ? 'var(--status-blue-bg)' : 'var(--status-green-bg)',
+                    color: acc.role === 'super_admin' ? 'var(--color-primary)' : acc.role === 'admin' ? 'var(--status-blue-text)' : 'var(--status-green-text)'
+                  }}>
+                    {acc.roleLabel}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <button
           onClick={toggleTheme}
           className="btn btn-secondary"

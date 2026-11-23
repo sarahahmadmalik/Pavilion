@@ -8,6 +8,7 @@ import {
   Bell,
   MessageSquare,
   User,
+  Users,
   LogOut,
   ChevronDown,
   Shield,
@@ -23,6 +24,7 @@ import {
 import { GlobalSearchBar } from './GlobalSearchBar.jsx';
 import { UserAvatar } from '../common/UserAvatar.jsx';
 import { ConfirmDialog } from '../common/ConfirmDialog.jsx';
+import { DEMO_ACCOUNTS } from '../../lib/demoAccounts.js';
 
 const ROLE_LABELS = {
   super_admin: 'Super Admin',
@@ -37,12 +39,23 @@ const ROLE_ICONS = {
 };
 
 export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery, unreadCount, onOpenNotifications, onToggleMobileSidebar }) => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, login, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { chatUnreadCount = 0 } = useNotifications() || {};
 
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showDemoMenu, setShowDemoMenu] = useState(false);
+  const [switchingDemo, setSwitchingDemo] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
+  const handleSwitchDemoUser = async (acc) => {
+    setShowDemoMenu(false);
+    if (acc.email === currentUser?.email) return;
+    setSwitchingDemo(true);
+    await login(acc.email, acc.password);
+    setSwitchingDemo(false);
+    setActivePage('dashboard');
+  };
 
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role;
 
@@ -97,6 +110,68 @@ export const Header = ({ activePage, setActivePage, searchQuery, setSearchQuery,
             100% { transform: scale(2.1); opacity: 0; }
           }
         `}</style>
+
+        {/* Demo User Quick-Switch Button — right beside Theme Toggle */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            disabled={switchingDemo}
+            onClick={() => setShowDemoMenu(!showDemoMenu)}
+            className="btn btn-ghost btn-sm"
+            style={{
+              padding: '0.35rem 0.65rem',
+              borderRadius: 'var(--radius-full)',
+              border: '1px solid var(--border-color)',
+              fontSize: '0.75rem',
+              gap: '0.35rem'
+            }}
+            title="Switch Demo User"
+          >
+            <Users size={14} color="var(--color-primary)" />
+            <span>Demo</span>
+          </button>
+
+          <AnimatedDropdown
+            isOpen={showDemoMenu}
+            onClose={() => setShowDemoMenu(false)}
+            width="245px"
+            align="right"
+          >
+            <div style={{ padding: '0.45rem 0.75rem', fontSize: '0.6875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)' }}>
+              Switch Demo User
+            </div>
+            {DEMO_ACCOUNTS.map(acc => {
+              const isCurrent = acc.email === currentUser?.email;
+              return (
+                <button
+                  key={acc.email}
+                  type="button"
+                  onClick={() => handleSwitchDemoUser(acc)}
+                  className="btn btn-ghost btn-sm"
+                  style={{
+                    width: '100%',
+                    justifyContent: 'space-between',
+                    padding: '0.5rem 0.75rem',
+                    borderRadius: '6px',
+                    backgroundColor: isCurrent ? 'var(--color-primary-light)' : 'transparent'
+                  }}
+                >
+                  <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-main)' }}>{acc.name}</span>
+                  <span style={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    padding: '2px 7px',
+                    borderRadius: '999px',
+                    backgroundColor: acc.role === 'super_admin' ? 'var(--color-primary-light)' : acc.role === 'admin' ? 'var(--status-blue-bg)' : 'var(--status-green-bg)',
+                    color: acc.role === 'super_admin' ? 'var(--color-primary)' : acc.role === 'admin' ? 'var(--status-blue-text)' : 'var(--status-green-text)'
+                  }}>
+                    {acc.roleLabel}
+                  </span>
+                </button>
+              );
+            })}
+          </AnimatedDropdown>
+        </div>
 
         {/* Theme Toggle Button — visible on desktop / tablet (>768px) */}
         <button

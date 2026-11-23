@@ -200,7 +200,7 @@ export const Dashboard = ({ setActivePage }) => {
     if (role === 'super_admin' || role === 'admin') return true;
     const key = (log.moduleName || '').toLowerCase().replace(/\s+/g, '_');
     return hasModulePermission(key);
-  }).slice(0, 2);
+  }).slice(0, 15);
 
   // ─── Role-Specific KPI card configs ────────────────────────────────────────
   const availableSuitesCount = data.rooms.filter(r => r.status === 'Available').length;
@@ -407,8 +407,34 @@ export const Dashboard = ({ setActivePage }) => {
         }
       </div>
 
-      {/* ─── Needs Attention & Suite/Project Visual Breakdown ──────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem' }}>
+      {/* ─── Row 2: Maintenance Ticket Status + Needs Attention ─────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
+        {hasModulePermission('gh_maintenance') && (
+          <div style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+              Maintenance Ticket Status
+            </h4>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Combined GH &amp; Office work order breakdown.
+            </p>
+            {loading
+              ? <ChartSkeleton height={240} />
+              : (openMaintenanceCount + inProgressCount + resolvedCount === 0)
+                ? (
+                  <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
+                    <Wrench size={28} color="var(--border-color)" />
+                    <span>No maintenance records yet</span>
+                  </div>
+                )
+                : <MaintenancePieChart openCount={openMaintenanceCount} inProgressCount={inProgressCount} resolvedCount={resolvedCount} />
+            }
+          </div>
+        )}
+
         {/* Needs Attention */}
         <div style={{
           padding: '1.25rem', borderRadius: 'var(--radius-lg)',
@@ -434,7 +460,7 @@ export const Dashboard = ({ setActivePage }) => {
               Everything is running smoothly — no urgent items right now.
             </p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', overflowY: 'auto', maxHeight: '240px', paddingRight: '4px' }}>
               {needsAttentionItems.map((item, idx) => (
                 <button
                   key={idx}
@@ -462,106 +488,45 @@ export const Dashboard = ({ setActivePage }) => {
             </div>
           )}
         </div>
-
-        {/* Occupancy & Project Progress Bars */}
-        <div style={{
-          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.9rem'
-        }}>
-          <div>
-            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>Operations Health</h4>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Live capacity &amp; execution metrics</p>
-          </div>
-
-          {[
-            { label: 'Guest House Occupancy', pct: occupancyPct, meta: `${occupiedRoomsCount}/${data.rooms.length} suites`, color: '#1A3FA0' },
-            { label: 'Maintenance Resolution Rate', pct: allMaintenance.length ? Math.round((resolvedCount / allMaintenance.length) * 100) : 100, meta: `${resolvedCount}/${allMaintenance.length} resolved`, color: '#10B981' },
-            { label: 'Project Completion', pct: data.projects.length ? Math.round(((data.projects.length - activeProjectsCount) / data.projects.length) * 100) : 0, meta: `${data.projects.length - activeProjectsCount}/${data.projects.length} completed`, color: '#3B82F6' }
-          ].map(bar => (
-            <div key={bar.label}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '0.35rem' }}>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{bar.label}</span>
-                <span style={{ color: 'var(--text-muted)' }}>{bar.meta} ({bar.pct}%)</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-                <div style={{ width: `${bar.pct}%`, height: '100%', backgroundColor: bar.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* ─── Main Content Grid (Left: Charts, Right: Recent Activity Card) ─── */}
-      <div className="dashboard-main-grid">
-
-        {/* Left Column: Analytics Charts */}
-        {(hasModulePermission('gh_maintenance') || hasModulePermission('office_bills')) && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-
-            {hasModulePermission('gh_maintenance') && (
-              <div style={{
-                padding: '1.25rem', borderRadius: 'var(--radius-lg)',
-                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-                  Maintenance Ticket Status
-                </h4>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Combined GH &amp; Office work order breakdown.
-                </p>
-                {loading
-                  ? <ChartSkeleton height={240} />
-                  : (openMaintenanceCount + inProgressCount + resolvedCount === 0)
-                    ? (
-                      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
-                        <Wrench size={28} color="var(--border-color)" />
-                        <span>No maintenance records yet</span>
-                      </div>
-                    )
-                    : <MaintenancePieChart openCount={openMaintenanceCount} inProgressCount={inProgressCount} resolvedCount={resolvedCount} />
-                }
-              </div>
-            )}
-
-            {hasModulePermission('office_bills') && (
-              <div style={{
-                padding: '1.25rem', borderRadius: 'var(--radius-lg)',
-                backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                boxShadow: 'var(--shadow-sm)'
-              }}>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
-                  Utility &amp; Vendor Bill Disbursements
-                </h4>
-                <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-                  Recent payments breakdown (GHS).
-                </p>
-                {loading
-                  ? <ChartSkeleton height={240} />
-                  : data.bills.length === 0
-                    ? (
-                      <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
-                        <CreditCard size={28} color="var(--border-color)" />
-                        <span>No bill payments recorded yet</span>
-                      </div>
-                    )
-                    : <BillsBarChart bills={data.bills} />
-                }
-              </div>
-            )}
+      {/* ─── Row 3: Utility & Vendor Bill Disbursements + Recent Activity ───── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
+        {hasModulePermission('office_bills') && (
+          <div style={{
+            padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+            backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-sm)'
+          }}>
+            <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+              Utility &amp; Vendor Bill Disbursements
+            </h4>
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
+              Recent payments breakdown (GHS).
+            </p>
+            {loading
+              ? <ChartSkeleton height={240} />
+              : data.bills.length === 0
+                ? (
+                  <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.8125rem', flexDirection: 'column', gap: '0.5rem' }}>
+                    <CreditCard size={28} color="var(--border-color)" />
+                    <span>No bill payments recorded yet</span>
+                  </div>
+                )
+                : <BillsBarChart bills={data.bills} />
+            }
           </div>
         )}
 
-        {/* Right Column: Recent Operational Activity Card */}
+        {/* Recent Operational Activity Card (with max-height & scrollbar) */}
         <div style={{
           padding: '1.25rem', borderRadius: 'var(--radius-lg)',
           backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
           boxShadow: 'var(--shadow-sm)',
           display: 'flex', flexDirection: 'column',
-          height: '100%', minHeight: '520px'
+          maxHeight: '340px'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem', flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               <Activity size={18} color="var(--color-primary)" />
               <h4 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>
@@ -580,14 +545,14 @@ export const Dashboard = ({ setActivePage }) => {
           </div>
 
           {loading
-            ? <ActivityFeedSkeleton rows={5} />
+            ? <ActivityFeedSkeleton rows={4} />
             : filteredActivityLogs.length > 0
               ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', overflowY: 'auto', flex: 1, paddingRight: '4px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', overflowY: 'auto', flex: 1, paddingRight: '6px' }}>
                   {filteredActivityLogs.map(log => (
                     <div key={log.id} style={{
                       display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem',
-                      padding: '0.75rem', borderRadius: 'var(--radius-md)',
+                      padding: '0.7rem', borderRadius: 'var(--radius-md)',
                       backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border-color)'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flex: 1, minWidth: '160px' }}>
@@ -611,18 +576,44 @@ export const Dashboard = ({ setActivePage }) => {
                 </div>
               )
               : (
-                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
                   <Activity size={32} color="var(--border-color)" style={{ marginBottom: '0.5rem' }} />
                   <p style={{ fontSize: '0.8125rem' }}>No recent activity logged yet.</p>
                 </div>
               )
           }
         </div>
-
       </div>
 
-      {/* ─── Platform Modules Overview ─────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
+      {/* ─── Row 4: Operations Health + Platform Modules Overview ────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
+        {/* Occupancy & Project Progress Bars */}
+        <div style={{
+          padding: '1.25rem', borderRadius: 'var(--radius-lg)',
+          backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)',
+          boxShadow: 'var(--shadow-sm)', display: 'flex', flexDirection: 'column', gap: '0.9rem'
+        }}>
+          <div>
+            <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-main)' }}>Operations Health</h4>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Live capacity &amp; execution metrics</p>
+          </div>
+
+          {[
+            { label: 'Guest House Occupancy', pct: occupancyPct, meta: `${occupiedRoomsCount}/${data.rooms.length} suites`, color: '#1A3FA0' },
+            { label: 'Maintenance Resolution', pct: allMaintenance.length ? Math.round((resolvedCount / allMaintenance.length) * 100) : 100, meta: `${resolvedCount}/${allMaintenance.length} resolved`, color: '#10B981' },
+            { label: 'Project Completion', pct: data.projects.length ? Math.round(((data.projects.length - activeProjectsCount) / data.projects.length) * 100) : 0, meta: `${data.projects.length - activeProjectsCount}/${data.projects.length} completed`, color: '#3B82F6' }
+          ].map(bar => (
+            <div key={bar.label}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '0.35rem' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{bar.label}</span>
+                <span style={{ color: 'var(--text-muted)' }}>{bar.meta} ({bar.pct}%)</span>
+              </div>
+              <div style={{ height: '7px', backgroundColor: 'var(--bg-page)', borderRadius: '999px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
+                <div style={{ width: `${bar.pct}%`, height: '100%', backgroundColor: bar.color, borderRadius: '999px', transition: 'width 0.4s ease' }} />
+              </div>
+            </div>
+          ))}
+        </div>
         {/* Upcoming Community Events */}
         <div
           onClick={() => setActivePage('community_events')}

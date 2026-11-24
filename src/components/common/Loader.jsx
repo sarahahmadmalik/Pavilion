@@ -48,12 +48,14 @@ export const PageLoader = () => {
         </svg>
 
         <span style={{
-          fontSize: '1.3rem',
+          fontSize: '1.25rem',
           fontWeight: 800,
-          letterSpacing: '0.14em',
+          letterSpacing: '0.1em',
           color: 'var(--text-main)',
-          lineHeight: 1
+          lineHeight: 1,
+          whiteSpace: 'nowrap'
         }}>
+          <span style={{ color: 'var(--color-primary)', marginRight: '0.26em' }}>DUA</span>
           PAVILION
         </span>
       </div>

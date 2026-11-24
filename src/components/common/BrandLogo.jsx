@@ -19,12 +19,14 @@ export const BrandLogo = ({ size = 36, showText = true, lightText = true, subtit
       {showText && (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', minWidth: 0 }}>
           <span style={{
-            fontSize: size >= 48 ? '1.35rem' : size <= 34 ? '0.95rem' : '1.05rem',
+            fontSize: size >= 48 ? '1.28rem' : size <= 34 ? '0.88rem' : '0.98rem',
             fontWeight: 800,
-            letterSpacing: '0.12em',
+            letterSpacing: '0.09em',
             color: lightText ? '#FFFFFF' : 'var(--text-main)',
-            lineHeight: 1.05
+            lineHeight: 1.05,
+            whiteSpace: 'nowrap'
           }}>
+            <span style={{ color: lightText ? '#93C5FD' : 'var(--color-primary)', marginRight: '0.26em' }}>DUA</span>
             PAVILION
           </span>
           {subtitle && (
